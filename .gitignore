@@ -1,0 +1,61 @@
+# ===========================
+# IDE / Tool artifacts
+# ===========================
+.agents/
+.qoder/
+skills-lock.json
+.vscode/
+.idea/
+
+# ===========================
+# Python
+# ===========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+*.egg
+
+# ===========================
+# Environment variables
+# ===========================
+.env
+.env.local
+.env.*.local
+
+# ===========================
+# Node / React Native
+# ===========================
+node_modules/
+.expo/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+
+# ===========================
+# OS files
+# ===========================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===========================
+# Logs
+# ===========================
+*.log
+logs/
+
+# ===========================
+# Database
+# ===========================
+*.sqlite3
+*.db
