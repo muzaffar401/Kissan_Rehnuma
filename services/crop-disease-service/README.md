@@ -1,6 +1,6 @@
 # 🌿 Crop Disease Detection Service
 
-> **Kissan Rehnuma's** first microservice — detects crop diseases from leaf images, identifies symptoms, and recommends treatments with local Pakistani context (chemicals, PKR costs).
+> **Kissan Rehnuma's** first microservice — detects crop diseases from leaf images using a comprehensive differential diagnosis pipeline, identifies symptoms, and recommends treatments with local Pakistani context (chemicals, PKR costs).
 
 ---
 
@@ -9,13 +9,14 @@
 | Layer | Technology |
 |-------|-----------|
 | Framework | FastAPI (async) |
-| AI Engine | LangGraph (stateful agent workflow) |
-| Vision LLM | GPT-4o via OpenRouter |
+| AI Workflow | LangGraph (stateful agent graph) |
+| Vision LLM | Configurable via OpenRouter (Gemini Flash, GPT-4o, etc.) |
+| API Client | Direct httpx → OpenRouter REST API (no LangChain overhead) |
+| Structured Output | Native `json_schema` response_format + Pydantic v2 validation |
 | Database | PostgreSQL 16 + asyncpg |
 | ORM | SQLAlchemy 2.0 (async) |
-| Migrations | Alembic |
+| Migrations | Alembic (auto-run on startup) |
 | Image Storage | Cloudinary |
-| Validation | Pydantic v2 (structured output) |
 | Observability | LangSmith tracing |
 | Container | Docker (multi-stage) |
 
@@ -29,39 +30,52 @@ Farmer (Mobile App)
        │  POST /api/v1/disease/detect
        │  (image file + language)
        ▼
-┌──────────────────────────────────────────────────────┐
-│                  FastAPI Server                       │
-│                                                      │
-│  ┌─────────────────────────────────────────────────┐ │
-│  │            LangGraph Workflow                    │ │
-│  │                                                  │ │
-│  │  [validate_image]                                │ │
-│  │       │                                          │ │
-│  │       ├── NOT a plant ──────────► [save_to_db]   │ │
-│  │       │                          → "not a plant" │ │
-│  │       ▼ (is a plant)                             │ │
-│  │  [upload_image]  ──► Cloudinary                  │ │
-│  │       │                                          │ │
-│  │       ▼                                          │ │
-│  │  [detect_disease] ──► GPT-4o + CoT Prompt       │ │
-│  │       │                 + Structured Output       │ │
-│  │       ▼                                          │ │
-│  │  [confidence_gate]                               │ │
-│  │       │                                          │ │
-│  │       ├── LOW (< 0.70) ─────────► [save_to_db]   │ │
-│  │       │                          → "retake photo"│ │
-│  │       ▼ (HIGH)                                   │ │
-│  │  [save_to_database] ──► PostgreSQL               │ │
-│  │       │                                          │ │
-│  │       ▼                                          │ │
-│  │  DiagnosisResponse (JSON)                        │ │
-│  └─────────────────────────────────────────────────┘ │
-└──────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                    FastAPI Server                         │
+│                                                          │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │            LangGraph Workflow                       │ │
+│  │                                                     │ │
+│  │  [validate_image]  ← PIL format/size/dimensions     │ │
+│  │       │               (no LLM call — instant)       │ │
+│  │       ├── FAIL ───────────────────► [save_to_db]    │ │
+│  │       │                              → "failed"     │ │
+│  │       ▼ (pass)                                      │ │
+│  │  [upload_image]  ──► Cloudinary                     │ │
+│  │       │                                             │ │
+│  │       ▼                                             │ │
+│  │  [detect_disease] ──► Direct httpx → OpenRouter     │ │
+│  │       │                 + json_schema response_format │ │
+│  │       │                 + 7-step CoT prompt          │ │
+│  │       │                 (plant check + diagnosis     │ │
+│  │       │                  in SINGLE call)             │ │
+│  │       ▼                                             │ │
+│  │  [confidence_gate]                                  │ │
+│  │       │                                             │ │
+│  │       ├── NOT A PLANT ────────────► [save_to_db]    │ │
+│  │       ├── LOW (< 0.70) ───────────► [save_to_db]    │ │
+│  │       │                              → "retake"     │ │
+│  │       ▼ (HIGH)                                      │ │
+│  │  [save_to_database] ──► PostgreSQL                  │ │
+│  │       │                                             │ │
+│  │       ▼                                             │ │
+│  │  DiagnosisResponse (JSON)                           │ │
+│  └─────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────┘
        │
        ▼
-  Farmer gets: disease name, symptoms, treatment (English),
-  chemical + organic options with PKR cost
+  Farmer gets: disease name, symptoms, causes, treatment
+  recommendations (chemical + organic + PKR cost), prevention
+  tips, affected crops
 ```
+
+### Key Design: Single LLM Call
+
+Unlike a naive two-call approach (separate plant check + disease detection), this service combines **everything into one LLM call**. The comprehensive system prompt handles plant verification, systematic visual examination, differential diagnosis, confidence scoring, and treatment recommendations — all in a single request. This saves ~5-10 seconds per detection.
+
+### Key Design: Direct API Client
+
+Instead of LangChain's `ChatOpenRouter` (which adds 15-25% latency overhead from serialization, tool-definition tokens, and middleware), this service uses a **direct httpx client** that calls OpenRouter's REST API with native `json_schema` response_format.
 
 ---
 
@@ -80,23 +94,26 @@ crop-disease-service/
 │   │   ├── session.py             # Async engine + session factory
 │   │   └── models.py              # CropDiseaseLog ORM model
 │   ├── schemas/
-│   │   └── disease.py             # Pydantic schemas (request/response/LLM output)
+│   │   └── disease.py             # Pydantic schemas (VisionDiagnosis, API responses)
 │   ├── repositories/
-│   │   └── detection_repo.py      # DB queries + log builder
+│   │   └── detection_repo.py      # DB queries + log builder + history
 │   ├── services/
 │   │   ├── image_validator.py     # PIL-based image pre-flight checks
-│   │   └── cloud_storage.py       # Cloudinary upload wrapper
+│   │   ├── cloud_storage.py       # Cloudinary upload wrapper
+│   │   └── openrouter_client.py   # Direct httpx → OpenRouter (no LangChain)
 │   ├── agents/
 │   │   ├── graph.py               # LangGraph StateGraph (5 nodes + routing)
 │   │   └── prompts/
-│   │       └── diagnosis_prompt.py # System prompt (Pakistani Agri-Botanist)
+│   │       └── diagnosis_prompt.py # Comprehensive 7-step diagnosis prompt
+│   ├── static/
+│   │   └── test.html              # Browser test UI (upload + history)
 │   └── api/
 │       ├── deps.py                # Dependency injection (DB session)
 │       ├── router.py              # Root router (/api/v1)
 │       └── v1/
 │           ├── router.py          # V1 route aggregation
 │           └── endpoints/
-│               └── disease.py     # POST /detect, GET /health
+│               └── disease.py     # POST /detect, GET /history, GET /health
 ├── alembic/                       # Database migrations
 ├── tests/
 │   ├── unit/
@@ -123,7 +140,7 @@ Detect crop disease from a leaf/plant image.
 | `user_id` | String | No | null | Farmer/user identifier |
 | `language` | String | No | `en` | Response language: `en`, `ur`, `pa`, `sd` |
 
-**Response (200):**
+**Response (200) — Successful diagnosis:**
 
 ```json
 {
@@ -131,36 +148,21 @@ Detect crop disease from a leaf/plant image.
   "is_plant": true,
   "disease_name": "Tomato Early Blight",
   "scientific_name": "Alternaria solani",
-  "crop_type": "tomato",
+  "crop_type": "Tomato",
   "confidence": 0.87,
   "symptoms": [
-    "Brown/black concentric rings on leaves (target spots)",
-    "Lower leaves affected more severely than upper canopy",
-    "Yellowing and drying of affected leaves"
+    "Dark brown spots with concentric rings (target lesions) on older leaves",
+    "Yellow halo surrounding each spot, 2-10mm diameter",
+    "Lower canopy affected first, progressing upward"
   ],
-  "causes": [
-    "Alternaria solani fungus",
-    "Spreads rapidly in warm and humid conditions",
-    "Clay soil and poor air circulation"
-  ],
-  "treatment": {
-    "chemical": [
-      "Mancozeb 75% WP — 2gm/L water, spray every 10-12 days",
-      "Chlorothalonil — 2ml/L water"
-    ],
-    "organic": [
-      "Neem oil 5ml/L water spray",
-      "Trichoderma viride soil application",
-      "Remove and destroy affected leaves immediately"
-    ],
-    "estimated_cost_pkr": "Rs. 800-1200 per acre (chemical)"
-  },
+  "causes": "Alternaria solani fungus. Spreads via wind and water splash. Favored by warm temperatures (24-29°C), high humidity, and prolonged leaf wetness. Overwinters on crop debris and volunteer plants.",
+  "treatment_recommendations": "Chemical: Mancozeb 75% WP at 2g/L water, foliar spray every 10-12 days. Chlorothalonil 75% WP at 2ml/L as preventive. Organic: Neem oil 5ml/L spray. Trichoderma viride soil application at 2kg/acre with FYM. Remove and destroy infected leaves immediately. Cost: approximately PKR 1500-2500 per acre.",
   "prevention_tips": [
-    "Practice crop rotation (2-3 year cycle)",
-    "Use resistant varieties",
-    "Ensure proper field drainage"
+    "Practice 2-3 year crop rotation with non-solanaceous crops",
+    "Use certified disease-free seeds and resistant varieties",
+    "Ensure proper field drainage and avoid overhead irrigation"
   ],
-  "affected_crops": ["tomato", "potato", "pepper"],
+  "affected_crops": "Tomato, potato, pepper, eggplant (Solanaceae family)",
   "image_url": "https://res.cloudinary.com/.../scan.jpg",
   "language": "en",
   "message": ""
@@ -188,6 +190,43 @@ Detect crop disease from a leaf/plant image.
 }
 ```
 
+### `GET /api/v1/disease/history`
+
+Get scan history. Returns all successful plant scans, newest first.
+
+**Query Parameters:**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `user_id` | String | null | Filter by farmer/user ID |
+| `limit` | Integer | 50 | Max results (1-200) |
+
+**Response (200):**
+
+```json
+[
+  {
+    "scan_id": "a1b2c3d4-...",
+    "image_url": "https://res.cloudinary.com/.../scan.jpg",
+    "user_id": "farmer_001",
+    "language": "en",
+    "is_plant": true,
+    "disease_name": "Tomato Early Blight",
+    "scientific_name": "Alternaria solani",
+    "confidence": 0.87,
+    "crop_type": "Tomato",
+    "symptoms": ["Dark brown concentric ring spots...", "..."],
+    "causes": "Alternaria solani fungus...",
+    "treatment_recommendations": "Chemical: Mancozeb...",
+    "prevention_tips": ["Crop rotation...", "..."],
+    "affected_crops": "Tomato, potato, pepper...",
+    "status": "completed",
+    "error_message": null,
+    "created_at": "2026-08-27T01:47:33+00:00"
+  }
+]
+```
+
 ### `GET /api/v1/disease/health`
 
 Service health check.
@@ -197,7 +236,7 @@ Service health check.
   "status": "healthy",
   "service": "crop-disease-service",
   "database": "connected",
-  "vision_model": "openai/gpt-4o"
+  "vision_model": "google/gemini-2.5-flash"
 }
 ```
 
@@ -235,17 +274,15 @@ copy .env.example .env
 # 5. Create PostgreSQL database
 psql -U postgres -c "CREATE DATABASE kissan_crop_disease;"
 
-# 6. Generate initial migration (one-time only)
-uv run alembic revision --autogenerate -m "initial schema"
-
-# 7. Start the service (migrations run automatically on startup)
+# 6. Start the service (migrations run automatically on startup)
 uv run uvicorn app.main:app --reload --port 8001
 ```
 
 Service will be available at `http://localhost:8001`
 API docs at `http://localhost:8001/docs` (debug mode only)
+Test UI at `http://localhost:8001/test` (debug mode only)
 
-> **Auto-migration:** Database migrations run automatically on every service startup. When you change models, just generate a new migration (`uv run alembic revision --autogenerate -m "description"`) — it will be applied the next time the service starts.
+> **Auto-migration:** Database migrations run automatically on every service startup. When you change models, generate a new migration (`uv run alembic revision --autogenerate -m "description"`) — it will be applied the next time the service starts.
 
 ---
 
@@ -254,8 +291,10 @@ API docs at `http://localhost:8001/docs` (debug mode only)
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `DATABASE_URL` | Yes | `postgresql+asyncpg://...` | PostgreSQL connection string |
-| `OPENROUTER_API_KEY` | Yes | — | OpenRouter API key for GPT-4o |
+| `OPENROUTER_API_KEY` | Yes | — | OpenRouter API key |
 | `VISION_MODEL` | No | `openai/gpt-4o` | Model identifier on OpenRouter |
+| `VISION_TEMPERATURE` | No | `0.2` | LLM sampling temperature |
+| `VISION_MAX_TOKENS` | No | `2048` | Max response tokens |
 | `CONFIDENCE_THRESHOLD` | No | `0.70` | Minimum confidence to accept diagnosis |
 | `CLOUDINARY_CLOUD_NAME` | Yes | — | Cloudinary cloud name |
 | `CLOUDINARY_API_KEY` | Yes | — | Cloudinary API key |
@@ -265,6 +304,7 @@ API docs at `http://localhost:8001/docs` (debug mode only)
 | `MAX_IMAGE_SIZE_MB` | No | `10` | Maximum upload file size |
 | `MIN_IMAGE_WIDTH` | No | `224` | Minimum image width in pixels |
 | `MIN_IMAGE_HEIGHT` | No | `224` | Minimum image height in pixels |
+| `ALLOWED_CONTENT_TYPES` | No | `image/jpeg,image/png,image/webp` | Accepted MIME types (comma-separated) |
 
 ---
 
@@ -276,7 +316,7 @@ Every scan is persisted — successful, failed, or low-confidence. This data ser
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `id` | UUID | Primary key |
+| `id` | UUID | Primary key (server-generated) |
 | `user_id` | String (nullable) | Farmer identifier |
 | `image_url` | Text | Cloudinary URL |
 | `language` | String(5) | Response language code |
@@ -285,11 +325,11 @@ Every scan is persisted — successful, failed, or low-confidence. This data ser
 | `scientific_name` | String (nullable) | Latin/binomial name |
 | `confidence` | Float (nullable) | Model confidence (0.0–1.0) |
 | `crop_type` | String (nullable) | Affected crop |
-| `symptoms` | JSONB (nullable) | Array of symptoms |
-| `causes` | JSONB (nullable) | Array of causes |
-| `treatment` | JSONB (nullable) | Treatment plan object |
+| `symptoms` | JSONB (nullable) | Array of symptom descriptions |
+| `causes` | Text (nullable) | Disease cause explanation |
+| `treatment` | Text (nullable) | Treatment recommendations |
 | `prevention_tips` | JSONB (nullable) | Array of prevention tips |
-| `affected_crops` | JSONB (nullable) | Array of affected crops |
+| `affected_crops` | Text (nullable) | Commonly affected crops |
 | `status` | Enum | `completed`, `low_confidence`, `not_a_plant`, `failed` |
 | `error_message` | Text (nullable) | Error details if failed |
 | `created_at` | Timestamp | When scan was performed |
@@ -298,17 +338,20 @@ Every scan is persisted — successful, failed, or low-confidence. This data ser
 
 ## Key Design Decisions
 
+### Why direct httpx instead of LangChain?
+LangChain's `ChatOpenRouter` + `with_structured_output()` adds 15-25% latency overhead from message serialization, tool-definition tokens, and middleware. A direct `httpx` POST to OpenRouter with native `json_schema` response_format is faster and gives the model more room for actual content. The `openrouter_client.py` module handles JSON extraction with fallback (markdown fences, partial JSON) and Pydantic validation.
+
+### Why single LLM call instead of two?
+A separate "is this a plant?" LLM call wastes ~5-10 seconds. The comprehensive system prompt includes plant verification as Step 1, so the model handles both checks in a single request. Non-LLM image validation (format, size, dimensions) still happens instantly via PIL before any API call.
+
 ### Why LangGraph?
-The diagnosis flow has **conditional branching** (confidence gate) and **state accumulation** (each node adds to the result). LangGraph handles this natively with `StateGraph` + conditional edges — cleaner than if/else chains in a single function.
+The diagnosis flow has **conditional branching** (confidence gate, not-a-plant routing) and **state accumulation** (each node adds to the result). LangGraph handles this natively with `StateGraph` + conditional edges — cleaner than if/else chains in a single function.
 
-### Why OpenRouter instead of direct OpenAI?
-OpenRouter provides a unified API with automatic failover. If OpenAI is down, it can route to another provider. One API key, multiple models.
-
-### Why structured output?
-The Vision LLM is forced to return a `VisionDiagnosis` Pydantic model via `with_structured_output()`. This guarantees the frontend always receives valid JSON — no parsing errors, no crashes.
+### Why comprehensive prompt?
+The 7-step differential diagnosis prompt includes a Pakistani crop disease database with exact pathogen names (e.g., *Puccinia triticina* for wheat leaf rust), systematic visual examination protocol, validation checklist, and conservative confidence scoring. This produces significantly more accurate and detailed diagnoses than a generic prompt.
 
 ### Why conservative confidence?
-Research (LeafBench 2025) shows GPT-4o achieves ~85% accuracy on disease identification but only ~52% on symptom identification. A 0.70 threshold prevents overconfident wrong diagnoses from reaching farmers.
+Vision LLMs can be overconfident on out-of-distribution images. A 0.70 threshold prevents wrong diagnoses from reaching farmers. A wrong diagnosis is worse than no diagnosis — Pakistani farmers act on this advice.
 
 ### Why every scan is saved?
 Failed and low-confidence scans are as valuable as successful ones. This data becomes the training set for a future Pakistani crop-specific CV model.
@@ -316,6 +359,17 @@ Failed and low-confidence scans are as valuable as successful ones. This data be
 ---
 
 ## Testing
+
+### Browser Test UI
+
+Open `http://localhost:8001/test` for a drag-and-drop test interface with:
+- Image upload with preview
+- Language selector (English, Urdu, Punjabi, Sindhi)
+- Diagnosis result display with confidence badges
+- Scan history with image thumbnails, symptoms, and treatment
+- Raw JSON toggle for debugging
+
+### Automated Tests
 
 ```bash
 # Unit tests (no DB, no API calls)

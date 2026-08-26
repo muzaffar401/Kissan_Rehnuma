@@ -3,7 +3,7 @@
 LangChain's ChatOpenRouter + with_structured_output() adds 15-25%
 latency overhead (serialization, tool-definition tokens, middleware).
 This module calls the OpenRouter REST API directly via httpx with
-native json_schema response_format — same approach VetFarm.AI uses.
+native json_schema response_format for maximum speed.
 """
 
 import json
