@@ -1,9 +1,7 @@
-from typing import Any
+from typing import Any, Optional, TypedDict
 
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.graph import END, StateGraph
-from langchain_core.messages import HumanMessage
-from langchain_openrouter import ChatOpenRouter
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.prompts.diagnosis_prompt import SYSTEM_PROMPT
@@ -12,46 +10,45 @@ from app.core.logging import get_logger
 from app.db.models import ScanStatus
 from app.repositories.detection_repo import DetectionRepository
 from app.schemas.disease import VisionDiagnosis
+from app.services.openrouter_client import call_vision_model, OpenRouterError
 
 log = get_logger(__name__)
 
 
 # ── State ────────────────────────────────────────────────────────
-# Every node reads/writes from this shared dictionary.
-# Fields are added progressively as the graph executes.
 
-class DiagnosisState(dict):
-    """Not a real class — LangGraph uses TypedDict-style state.
-
-    We define it as a plain dict subclass for simplicity.
-    Actual keys are documented below.
-
-    Keys:
-        image_bytes: bytes              — raw uploaded image
-        content_type: str               — MIME type
-        user_id: str | None             — farmer identifier
-        language: str                   — response language code
-        session: AsyncSession           — DB session (from configurable)
-        is_plant: bool                  — set by validate_image node
-        image_url: str                  — set by upload_image node
-        diagnosis: VisionDiagnosis      — set by detect_disease node
-        confidence_ok: bool             — set by confidence_gate node
-        scan_status: ScanStatus         — set throughout flow
-        error_message: str | None       — set on failure
-        response: dict                  — final assembled response
-    """
+class DiagnosisState(TypedDict):
+    """Shared state across all graph nodes."""
+    # Input (set by endpoint)
+    image_bytes: bytes
+    content_type: str
+    user_id: Optional[str]
+    language: str
+    session: Any  # AsyncSession — not serialisable, but lives in memory
+    # Set by validate_image (non-LLM pre-flight only)
+    is_plant: bool
+    # Set by upload_image
+    image_url: str
+    # Set by detect_disease
+    diagnosis: Any  # VisionDiagnosis
+    # Set by confidence_gate
+    confidence_ok: bool
+    # Set throughout flow
+    scan_status: ScanStatus
+    error_message: Optional[str]
+    # Final output
+    response: dict
 
 
 # ── Node functions ───────────────────────────────────────────────
 
 async def validate_image(state: DiagnosisState) -> dict:
-    """Check if the uploaded image is actually a plant.
+    """Non-LLM pre-flight checks: format, size, dimensions.
 
-    Uses the Vision LLM with a minimal prompt — just yes/no.
-    This is a cheap gate to avoid running the full diagnostic
-    pipeline on non-plant images (selfies, screenshots, etc.)
+    The plant/not-plant decision is now handled inside detect_disease
+    by the comprehensive prompt — no separate LLM call needed.
     """
-    from app.services.image_validator import ImageValidator
+    from app.services.image_validator import ImageValidator, ImageValidationError
 
     image_bytes: bytes = state["image_bytes"]
     content_type: str = state["content_type"]
@@ -59,7 +56,7 @@ async def validate_image(state: DiagnosisState) -> dict:
     validator = ImageValidator()
     try:
         validator.validate(image_bytes, content_type)
-    except Exception as exc:
+    except ImageValidationError as exc:
         log.warning("image_validation_failed", error=str(exc))
         return {
             "is_plant": False,
@@ -68,36 +65,7 @@ async def validate_image(state: DiagnosisState) -> dict:
             "error_message": f"Image validation failed: {exc}",
         }
 
-    # Quick plant check via Vision LLM
-    settings = get_settings()
-    model = ChatOpenRouter(
-        model=settings.vision_model,
-        api_key=settings.openrouter_api_key,
-        temperature=0.0,
-        max_tokens=50,
-    )
-
-    import base64
-    b64 = base64.b64encode(image_bytes).decode()
-
-    response = await model.ainvoke([
-        HumanMessage(content=[
-            {"type": "text", "text": "Is this image showing a plant or plant part (leaf, stem, fruit, flower)? Answer ONLY 'yes' or 'no'."},
-            {"type": "image_url", "image_url": {"url": f"data:{content_type};base64,{b64}"}},
-        ])
-    ])
-
-    answer = response.content.strip().lower()
-    is_plant = answer.startswith("yes")
-
-    if not is_plant:
-        log.info("image_not_a_plant", user_id=state.get("user_id"))
-
-    return {
-        "is_plant": is_plant,
-        "confidence_ok": is_plant,
-        "scan_status": ScanStatus.NOT_A_PLANT if not is_plant else ScanStatus.COMPLETED,
-    }
+    return {"is_plant": True}
 
 
 async def upload_image(state: DiagnosisState) -> dict:
@@ -115,20 +83,10 @@ async def upload_image(state: DiagnosisState) -> dict:
 async def detect_disease(state: DiagnosisState) -> dict:
     """Run the full diagnostic pipeline through Vision LLM.
 
-    Uses Chain-of-Thought prompting (embedded in SYSTEM_PROMPT)
-    and forces structured output via Pydantic + with_structured_output.
+    Uses a direct httpx call to OpenRouter (no LangChain overhead)
+    with native json_schema response_format for speed.
     """
     import base64
-
-    settings = get_settings()
-    model = ChatOpenRouter(
-        model=settings.vision_model,
-        api_key=settings.openrouter_api_key,
-        temperature=settings.vision_temperature,
-        max_tokens=settings.vision_max_tokens,
-    )
-
-    structured_model = model.with_structured_output(VisionDiagnosis)
 
     image_bytes: bytes = state["image_bytes"]
     content_type: str = state["content_type"]
@@ -142,18 +100,25 @@ async def detect_disease(state: DiagnosisState) -> dict:
         "sd": "Sindhi",
     }.get(language, "English")
 
-    user_prompt = (
-        f"Analyze this crop image for diseases. "
-        f"Respond in {language_label}."
-    )
+    # Combine system prompt + language instruction into one message
+    full_prompt = f"{SYSTEM_PROMPT}\n\nRespond in {language_label}."
+    image_data_uri = f"data:{content_type};base64,{b64}"
 
-    diagnosis: VisionDiagnosis = await structured_model.ainvoke([
-        {"role": "system", "content": SYSTEM_PROMPT},
-        HumanMessage(content=[
-            {"type": "text", "text": user_prompt},
-            {"type": "image_url", "image_url": {"url": f"data:{content_type};base64,{b64}"}},
-        ]),
-    ])
+    try:
+        diagnosis: VisionDiagnosis = await call_vision_model(
+            prompt_text=full_prompt,
+            image_data_uri=image_data_uri,
+            response_model=VisionDiagnosis,
+        )
+    except OpenRouterError as exc:
+        log.error("vision_model_failed", error=str(exc))
+        return {
+            "diagnosis": VisionDiagnosis(),
+            "is_plant": False,
+            "confidence_ok": False,
+            "scan_status": ScanStatus.FAILED,
+            "error_message": str(exc),
+        }
 
     log.info(
         "disease_detected",
@@ -162,19 +127,29 @@ async def detect_disease(state: DiagnosisState) -> dict:
         is_plant=diagnosis.is_plant,
     )
 
-    return {"diagnosis": diagnosis}
+    return {
+        "diagnosis": diagnosis,
+        "is_plant": diagnosis.is_plant,
+    }
 
 
 async def confidence_gate(state: DiagnosisState) -> dict:
     """Decide whether the diagnosis is trustworthy enough to present.
 
-    Research shows Vision LLMs can be overconfident on out-of-distribution
-    images. This gate catches low-confidence results and returns a
+    Vision LLMs can be overconfident on out-of-distribution images.
+    This gate catches low-confidence results and returns a
     "please retake" message instead of a potentially wrong diagnosis.
     """
     settings = get_settings()
     diagnosis: VisionDiagnosis = state["diagnosis"]
     threshold = settings.confidence_threshold
+
+    # If not a plant, skip confidence check
+    if not diagnosis.is_plant:
+        return {
+            "confidence_ok": True,
+            "scan_status": ScanStatus.NOT_A_PLANT,
+        }
 
     is_ok = diagnosis.confidence >= threshold
     log.info(
@@ -207,8 +182,8 @@ async def save_to_database(state: DiagnosisState) -> dict:
     log_entry = DetectionRepository.build_log(
         image_url=image_url,
         user_id=state.get("user_id"),
-        language=state.get("language", "ur"),
-        diagnosis=diagnosis if status == ScanStatus.COMPLETED else None,
+        language=state.get("language", "en"),
+        diagnosis=diagnosis if diagnosis and diagnosis.is_plant else None,
         status=status,
         error_message=error_msg,
     )
@@ -222,7 +197,7 @@ async def save_to_database(state: DiagnosisState) -> dict:
 # ── Routing ──────────────────────────────────────────────────────
 
 def route_after_validation(state: DiagnosisState) -> str:
-    if state.get("is_plant") and state.get("confidence_ok", True):
+    if state.get("is_plant") and state.get("scan_status") != ScanStatus.FAILED:
         return "upload_image"
     return "save_to_database"
 
@@ -267,7 +242,7 @@ def _assemble_response(log_entry, diagnosis, status: ScanStatus) -> dict:
         "confidence": diagnosis.confidence,
         "symptoms": diagnosis.symptoms,
         "causes": diagnosis.causes,
-        "treatment": diagnosis.treatment.model_dump() if diagnosis.treatment else None,
+        "treatment_recommendations": diagnosis.treatment_recommendations,
         "prevention_tips": diagnosis.prevention_tips,
         "affected_crops": diagnosis.affected_crops,
         "image_url": log_entry.image_url,
@@ -282,10 +257,11 @@ def build_graph() -> CompiledStateGraph:
     """Construct and compile the LangGraph diagnosis workflow.
 
     Flow:
-        validate_image → [is_plant?] → upload_image → detect_disease
+        validate_image (format/size only) → [pass?] → upload_image
+                     → detect_disease (plant check + diagnosis in 1 call)
                      → confidence_gate → save_to_database → END
     """
-    graph = StateGraph(dict)
+    graph = StateGraph(DiagnosisState)
 
     # Register nodes
     graph.add_node("validate_image", validate_image)
@@ -297,7 +273,7 @@ def build_graph() -> CompiledStateGraph:
     # Entry point
     graph.set_entry_point("validate_image")
 
-    # Conditional: if not a plant or validation failed, skip to DB save
+    # Conditional: if image validation failed, skip to DB save
     graph.add_conditional_edges(
         "validate_image",
         route_after_validation,

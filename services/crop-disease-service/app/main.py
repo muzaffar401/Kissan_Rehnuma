@@ -1,8 +1,10 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.router import api_router
 from app.core.config import get_settings
@@ -50,6 +52,15 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(api_router)
+
+    # ── Test UI (debug only) ─────────────────────────────────────
+    if settings.debug:
+        static_dir = Path(__file__).parent / "static"
+        app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+        @app.get("/test")
+        async def test_ui():
+            return FileResponse(static_dir / "test.html")
 
     @app.exception_handler(Exception)
     async def catch_unexpected(request: Request, exc: Exception):

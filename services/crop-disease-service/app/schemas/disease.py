@@ -7,12 +7,6 @@ from pydantic import BaseModel, Field
 # This is what GPT-4o returns via OpenRouter. The model is forced
 # into this exact shape through with_structured_output().
 
-class TreatmentPlan(BaseModel):
-    chemical: list[str] = Field(default_factory=list)
-    organic: list[str] = Field(default_factory=list)
-    estimated_cost_pkr: str = ""
-
-
 class VisionDiagnosis(BaseModel):
     """Raw structured output from the Vision LLM."""
 
@@ -22,10 +16,10 @@ class VisionDiagnosis(BaseModel):
     crop_type: str = ""
     confidence: float = Field(ge=0.0, le=1.0, default=0.0)
     symptoms: list[str] = Field(default_factory=list)
-    causes: list[str] = Field(default_factory=list)
-    treatment: TreatmentPlan = Field(default_factory=TreatmentPlan)
+    causes: str = ""
+    treatment_recommendations: str = ""
     prevention_tips: list[str] = Field(default_factory=list)
-    affected_crops: list[str] = Field(default_factory=list)
+    affected_crops: str = ""
 
 
 # ── API response schemas ─────────────────────────────────────────
@@ -40,10 +34,10 @@ class DiagnosisResponse(BaseModel):
     crop_type: str | None = None
     confidence: float | None = None
     symptoms: list[str] = Field(default_factory=list)
-    causes: list[str] = Field(default_factory=list)
-    treatment: TreatmentPlan | None = None
+    causes: str = ""
+    treatment_recommendations: str = ""
     prevention_tips: list[str] = Field(default_factory=list)
-    affected_crops: list[str] = Field(default_factory=list)
+    affected_crops: str = ""
     image_url: str = ""
     language: str = "en"
     message: str = ""

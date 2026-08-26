@@ -20,6 +20,7 @@ class DetectionRepository:
     async def save(self, log: CropDiseaseLog) -> CropDiseaseLog:
         self._session.add(log)
         await self._session.flush()
+        await self._session.refresh(log)
         return log
 
     async def get_by_id(self, scan_id: uuid.UUID) -> CropDiseaseLog | None:
@@ -39,6 +40,15 @@ class DetectionRepository:
         )
         return list(result.scalars().all())
 
+    async def get_all_history(self, limit: int = 50) -> list[CropDiseaseLog]:
+        result = await self._session.execute(
+            select(CropDiseaseLog)
+            .where(CropDiseaseLog.is_plant.is_(True))
+            .order_by(CropDiseaseLog.created_at.desc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
     @staticmethod
     def build_log(
         *,
@@ -51,7 +61,6 @@ class DetectionRepository:
     ) -> CropDiseaseLog:
         """Factory: create a CropDiseaseLog from a diagnosis result."""
         return CropDiseaseLog(
-            id=uuid.uuid4(),
             user_id=user_id,
             image_url=image_url,
             language=language,
@@ -62,7 +71,7 @@ class DetectionRepository:
             crop_type=diagnosis.crop_type if diagnosis else None,
             symptoms=diagnosis.symptoms if diagnosis else None,
             causes=diagnosis.causes if diagnosis else None,
-            treatment=diagnosis.treatment.model_dump() if diagnosis and diagnosis.treatment else None,
+            treatment=diagnosis.treatment_recommendations if diagnosis else None,
             prevention_tips=diagnosis.prevention_tips if diagnosis else None,
             affected_crops=diagnosis.affected_crops if diagnosis else None,
             status=status,

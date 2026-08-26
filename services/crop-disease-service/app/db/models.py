@@ -49,12 +49,12 @@ class CropDiseaseLog(Base):
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
     crop_type: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
 
-    # ── Rich diagnostic fields (stored as JSON arrays/objects) ───
+    # ── Rich diagnostic fields ──────────────────────────────────
     symptoms: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=None)
-    causes: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=None)
-    treatment: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=None)
+    causes: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    treatment: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
     prevention_tips: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=None)
-    affected_crops: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=None)
+    affected_crops: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
 
     # ── Metadata ─────────────────────────────────────────────────
     status: Mapped[ScanStatus] = mapped_column(

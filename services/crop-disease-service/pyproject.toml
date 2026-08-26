@@ -20,8 +20,6 @@ dependencies = [
 
     # ── AI / LLM ──
     "langgraph>=0.4",
-    "langchain-core>=1.5",
-    "langchain-openrouter>=0.2.8",
 
     # ── Image processing ──
     "Pillow>=11.0,<12.0",

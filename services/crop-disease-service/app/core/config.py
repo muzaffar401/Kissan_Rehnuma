@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     # ── Vision LLM (OpenRouter) ──────────────────────────────────
     openrouter_api_key: str = ""
     vision_model: str = "openai/gpt-4o"
-    vision_temperature: float = 0.1
+    vision_temperature: float = 0.2
     vision_max_tokens: int = 2048
 
     # ── Confidence Gate ──────────────────────────────────────────
