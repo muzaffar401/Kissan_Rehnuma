@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kissan Rehnuma - Voice Helpline Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.1/dist/livekit-client.umd.min.js" crossorigin="anonymous"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container { max-width: 900px; margin: 0 auto; }
+
+        h1 { text-align: center; color: white; margin-bottom: 30px; font-size: 2em; }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        }
+
+        .card h2 {
+            color: #1e3c72;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .form-group { margin-bottom: 15px; }
+
+        label { display: block; margin-bottom: 5px; font-weight: 600; color: #555; }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, select:focus, textarea:focus { outline: none; border-color: #2a5298; }
+        textarea { min-height: 100px; resize: vertical; }
+
+        .btn {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(30, 60, 114, 0.4); }
+        .btn:disabled { background: #ccc; cursor: not-allowed; transform: none; box-shadow: none; }
+        .btn-secondary { background: #6c757d; }
+        .btn-danger { background: #dc3545; }
+        .btn-success { background: #28a745; }
+        .btn-warning { background: #ffc107; color: #333; }
+
+        .btn-group { display: flex; gap: 10px; flex-wrap: wrap; }
+
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .result.success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .result.error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .result.info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+
+        .history-item {
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+
+        .history-item h4 { color: #1e3c72; margin-bottom: 8px; }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-right: 8px;
+        }
+
+        .badge-active { background: #d4edda; color: #155724; }
+        .badge-pending { background: #fff3cd; color: #856404; }
+        .badge-completed { background: #d1ecf1; color: #0c5460; }
+        .badge-failed { background: #f8d7da; color: #721c24; }
+        .badge-expired { background: #e2e3e5; color: #383d49; }
+        .badge-low { background: #d4edda; color: #155724; }
+        .badge-normal { background: #fff3cd; color: #856404; }
+        .badge-high { background: #f8d7da; color: #721c24; }
+
+        .hidden { display: none; }
+
+        /* Voice Call UI */
+        .call-panel {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .call-status {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            padding: 10px 20px;
+            border-radius: 25px;
+            display: inline-block;
+        }
+
+        .call-status.idle { background: #e2e3e5; color: #383d49; }
+        .call-status.connecting { background: #fff3cd; color: #856404; }
+        .call-status.connected { background: #d4edda; color: #155724; }
+        .call-status.failed { background: #f8d7da; color: #721c24; }
+
+        .call-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .call-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            font-size: 24px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .call-btn:hover { transform: scale(1.1); }
+        .call-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .call-btn.mute-btn { background: #ffc107; }
+        .call-btn.mute-btn.muted { background: #dc3545; }
+        .call-btn.hangup-btn { background: #dc3545; }
+        .call-btn.connect-btn { background: #28a745; }
+
+        .call-log {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            text-align: left;
+            font-size: 13px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .call-log p { margin-bottom: 5px; }
+        .call-log .log-info { color: #0c5460; }
+        .call-log .log-success { color: #155724; font-weight: 600; }
+        .call-log .log-error { color: #721c24; font-weight: 600; }
+        .call-log .log-rpc { color: #6f42c1; }
+
+        .pulse {
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(40, 167, 69, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📞 Voice Helpline Test</h1>
+
+        <!-- User Identity -->
+        <div class="card">
+            <h2>👤 Farmer Identity</h2>
+            <div class="form-group">
+                <label>User ID (UUID)</label>
+                <input type="text" id="userId" value="550e8400-e29b-41d4-a716-446655440000">
+            </div>
+            <div class="form-group">
+                <label>User Name</label>
+                <input type="text" id="userName" value="Test Farmer">
+            </div>
+        </div>
+
+        <!-- Voice Call Panel -->
+        <div class="card">
+            <h2>🎙️ Voice Call</h2>
+            <div class="call-panel">
+                <div id="callStatus" class="call-status idle">No Active Call</div>
+                <div class="call-controls">
+                    <button class="call-btn connect-btn" id="connectBtn" onclick="connectToCall()" title="Connect">📞</button>
+                    <button class="call-btn mute-btn" id="muteBtn" onclick="toggleMute()" disabled title="Mute/Unmute">🎤</button>
+                    <button class="call-btn hangup-btn" id="hangupBtn" onclick="disconnectCall()" disabled title="Hang Up">📴</button>
+                </div>
+                <div id="callLog" class="call-log hidden"></div>
+            </div>
+        </div>
+
+        <!-- Session Management -->
+        <div class="card">
+            <h2>⚙️ Session Management</h2>
+            <div class="btn-group">
+                <button class="btn" onclick="createSession()">Create Session</button>
+                <button class="btn btn-secondary" onclick="getSession()">Get Session</button>
+                <button class="btn btn-danger" onclick="endSession()">End Session</button>
+            </div>
+            <div class="form-group" style="margin-top: 15px;">
+                <label>Session ID</label>
+                <input type="text" id="sessionId" placeholder="Auto-filled after creation">
+            </div>
+            <div class="form-group">
+                <label>Language</label>
+                <select id="sessionLanguage">
+                    <option value="ur">Urdu (ur)</option>
+                    <option value="en">English (en)</option>
+                    <option value="pa">Punjabi (pa)</option>
+                    <option value="sd">Sindhi (sd)</option>
+                </select>
+            </div>
+            <div id="sessionResult" class="result hidden"></div>
+        </div>
+
+        <!-- Complaint Management -->
+        <div class="card">
+            <h2>📝 Complaint Registration</h2>
+            <div class="form-group">
+                <label>Category</label>
+                <select id="complaintCategory">
+                    <option value="crop_disease">Crop Disease</option>
+                    <option value="animal_health">Animal Health</option>
+                    <option value="market">Market</option>
+                    <option value="weather">Weather</option>
+                    <option value="irrigation">Irrigation</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea id="complaintDescription" placeholder="Describe the issue..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Crop (optional)</label>
+                <input type="text" id="complaintCrop" placeholder="e.g., Wheat, Rice">
+            </div>
+            <div class="form-group">
+                <label>District (optional)</label>
+                <input type="text" id="complaintDistrict" placeholder="e.g., Lahore, Multan">
+            </div>
+            <div class="form-group">
+                <label>Urgency</label>
+                <select id="complaintUrgency">
+                    <option value="normal">Normal</option>
+                    <option value="low">Low</option>
+                    <option value="high">High</option>
+                </select>
+            </div>
+            <div class="btn-group">
+                <button class="btn" onclick="createComplaint()">Register Complaint</button>
+                <button class="btn btn-secondary" onclick="listComplaints()">List Complaints</button>
+                <button class="btn btn-secondary" onclick="getComplaint()">Get by Reference</button>
+            </div>
+            <div class="form-group" style="margin-top: 15px;">
+                <label>Reference Number</label>
+                <input type="text" id="referenceNumber" placeholder="KR-2026-...">
+            </div>
+            <div id="complaintResult" class="result hidden"></div>
+        </div>
+
+        <!-- History -->
+        <div class="card">
+            <h2>📋 Complaint History</h2>
+            <button class="btn" onclick="loadHistory()">Refresh History</button>
+            <div id="historyContainer" style="margin-top: 20px;"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8003/api/v1';
+        const LK = LivekitClient;
+
+        let room = null;
+        let currentSession = null;
+        let isMuted = false;
+
+        // ─── Helpers ───
+
+        function getHeaders() {
+            return {
+                'X-User-Id': document.getElementById('userId').value,
+                'X-User-Name': document.getElementById('userName').value,
+                'Content-Type': 'application/json'
+            };
+        }
+
+        function showResult(id, data, isError) {
+            const el = document.getElementById(id);
+            el.className = 'result ' + (isError ? 'error' : 'success');
+            el.textContent = JSON.stringify(data, null, 2);
+            el.classList.remove('hidden');
+        }
+
+        function showError(id, msg) {
+            const el = document.getElementById(id);
+            el.className = 'result error';
+            el.textContent = msg;
+            el.classList.remove('hidden');
+        }
+
+        function setCallStatus(status, text) {
+            const el = document.getElementById('callStatus');
+            el.className = 'call-status ' + status;
+            el.textContent = text;
+        }
+
+        function callLog(msg, type) {
+            const log = document.getElementById('callLog');
+            log.classList.remove('hidden');
+            const p = document.createElement('p');
+            p.className = 'log-' + (type || 'info');
+            const time = new Date().toLocaleTimeString();
+            p.textContent = '[' + time + '] ' + msg;
+            log.appendChild(p);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        // ─── LiveKit Voice Call ───
+
+        async function connectToCall() {
+            if (!currentSession || !currentSession.token) {
+                alert('Please create a session first');
+                return;
+            }
+
+            const connectBtn = document.getElementById('connectBtn');
+            const muteBtn = document.getElementById('muteBtn');
+            const hangupBtn = document.getElementById('hangupBtn');
+
+            connectBtn.disabled = true;
+            setCallStatus('connecting', 'Connecting...');
+            callLog('Connecting to LiveKit room...', 'info');
+
+            try {
+                room = new LK.Room({
+                    adaptiveStream: true,
+                    dynacast: true
+                });
+
+                // Event: track subscribed (remote audio from agent)
+                room.on(LK.RoomEvent.TrackSubscribed, function(track, publication, participant) {
+                    callLog('Received ' + track.kind + ' track from agent', 'success');
+                    if (track.kind === 'audio') {
+                        const element = track.attach();
+                        document.body.appendChild(element);
+                    }
+                });
+
+                // Event: track unsubscribed
+                room.on(LK.RoomEvent.TrackUnsubscribed, function(track) {
+                    track.detach().forEach(function(el) { el.remove(); });
+                });
+
+                // Event: participant connected
+                room.on(LK.RoomEvent.ParticipantConnected, function(participant) {
+                    callLog('Agent joined: ' + participant.identity, 'success');
+                });
+
+                // Event: participant disconnected
+                room.on(LK.RoomEvent.ParticipantDisconnected, function(participant) {
+                    callLog('Agent left: ' + participant.identity, 'info');
+                });
+
+                // Event: disconnected
+                room.on(LK.RoomEvent.Disconnected, function(reason) {
+                    callLog('Disconnected: ' + (reason || 'unknown'), 'info');
+                    setCallStatus('idle', 'Call Ended');
+                    connectBtn.disabled = false;
+                    muteBtn.disabled = true;
+                    hangupBtn.disabled = true;
+                    isMuted = false;
+                    muteBtn.classList.remove('muted');
+                });
+
+                // Event: audio playback status
+                room.on(LK.RoomEvent.AudioPlaybackStatusChanged, function() {
+                    if (!room.canPlaybackAudio) {
+                        callLog('Audio playback blocked — user interaction needed', 'error');
+                        room.startAudio();
+                    }
+                });
+
+                // Event: local track unpublished
+                room.on(LK.RoomEvent.LocalTrackUnpublished, function(publication) {
+                    publication.track.detach();
+                });
+
+                // Register RPC method for register_complaint
+                room.localParticipant.registerRpcMethod('register_complaint', async function(data) {
+                    callLog('RPC register_complaint received from agent', 'rpc');
+                    callLog('Payload: ' + JSON.stringify(data.payload), 'rpc');
+
+                    try {
+                        const payload = typeof data.payload === 'string' ? JSON.parse(data.payload) : data.payload;
+                        const result = await registerComplaintFromRPC(payload);
+                        callLog('Complaint registered: ' + result.reference_number, 'success');
+                        return JSON.stringify({ success: true, reference_number: result.reference_number });
+                    } catch (err) {
+                        callLog('Complaint failed: ' + err.message, 'error');
+                        return JSON.stringify({ success: false, error: err.message });
+                    }
+                });
+
+                // Connect
+                await room.connect(currentSession.ws_url, currentSession.token);
+                callLog('Connected to room: ' + room.name, 'success');
+
+                // Publish microphone
+                await room.localParticipant.setMicrophoneEnabled(true);
+                callLog('Microphone enabled', 'success');
+
+                setCallStatus('connected', 'In Call');
+                setCallStatus('connected pulse', 'In Call');
+                muteBtn.disabled = false;
+                hangupBtn.disabled = false;
+
+            } catch (err) {
+                callLog('Connection failed: ' + err.message, 'error');
+                setCallStatus('failed', 'Connection Failed');
+                connectBtn.disabled = false;
+                console.error('LiveKit connection error:', err);
+            }
+        }
+
+        function toggleMute() {
+            if (!room) return;
+            isMuted = !isMuted;
+            room.localParticipant.setMicrophoneEnabled(!isMuted);
+            const muteBtn = document.getElementById('muteBtn');
+            if (isMuted) {
+                muteBtn.classList.add('muted');
+                muteBtn.title = 'Unmute';
+                callLog('Microphone muted', 'info');
+            } else {
+                muteBtn.classList.remove('muted');
+                muteBtn.title = 'Mute';
+                callLog('Microphone unmuted', 'info');
+            }
+        }
+
+        function disconnectCall() {
+            if (room) {
+                callLog('Hanging up...', 'info');
+                room.disconnect();
+                room = null;
+            }
+        }
+
+        // ─── RPC Complaint Handler ───
+
+        async function registerComplaintFromRPC(payload) {
+            if (!currentSession) throw new Error('No active session');
+
+            const idempotencyKey = 'rpc-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+
+            const response = await fetch(API_BASE + '/complaints', {
+                method: 'POST',
+                headers: Object.assign(getHeaders(), { 'Idempotency-Key': idempotencyKey }),
+                body: JSON.stringify({
+                    helpline_session_id: currentSession.session_id,
+                    category: payload.category || 'other',
+                    description: payload.description || 'Voice complaint',
+                    crop: payload.crop || null,
+                    district: payload.district || null,
+                    urgency: payload.urgency || 'normal'
+                })
+            });
+
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error ? data.error.message : 'Complaint registration failed');
+
+            document.getElementById('referenceNumber').value = data.reference_number;
+            loadHistory();
+            return data;
+        }
+
+        // ─── Session API ───
+
+        async function createSession() {
+            try {
+                const response = await fetch(API_BASE + '/helpline/sessions', {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ language: document.getElementById('sessionLanguage').value })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    document.getElementById('sessionId').value = data.session_id;
+                    currentSession = data;
+                    showResult('sessionResult', data);
+                    callLog('Session created — ready to connect', 'success');
+                } else {
+                    showError('sessionResult', 'Error: ' + JSON.stringify(data, null, 2));
+                }
+            } catch (err) {
+                showError('sessionResult', 'Network error: ' + err.message);
+            }
+        }
+
+        async function getSession() {
+            const sid = document.getElementById('sessionId').value;
+            if (!sid) { showError('sessionResult', 'Enter Session ID'); return; }
+            try {
+                const response = await fetch(API_BASE + '/helpline/sessions/' + sid, { headers: getHeaders() });
+                const data = await response.json();
+                if (response.ok) showResult('sessionResult', data);
+                else showError('sessionResult', 'Error: ' + JSON.stringify(data, null, 2));
+            } catch (err) {
+                showError('sessionResult', 'Network error: ' + err.message);
+            }
+        }
+
+        async function endSession() {
+            const sid = document.getElementById('sessionId').value;
+            if (!sid) { showError('sessionResult', 'Enter Session ID'); return; }
+            try {
+                const response = await fetch(API_BASE + '/helpline/sessions/' + sid + '/end', {
+                    method: 'POST', headers: getHeaders()
+                });
+                const data = await response.json();
+                if (response.ok) showResult('sessionResult', data);
+                else showError('sessionResult', 'Error: ' + JSON.stringify(data, null, 2));
+            } catch (err) {
+                showError('sessionResult', 'Network error: ' + err.message);
+            }
+        }
+
+        // ─── Complaint API ───
+
+        function generateIdempotencyKey() {
+            return 'idk-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+        }
+
+        async function createComplaint() {
+            const sid = document.getElementById('sessionId').value;
+            if (!sid) { showError('complaintResult', 'Create session first'); return; }
+            const desc = document.getElementById('complaintDescription').value;
+            if (!desc || desc.length < 5) { showError('complaintResult', 'Description must be 5+ chars'); return; }
+
+            try {
+                const response = await fetch(API_BASE + '/complaints', {
+                    method: 'POST',
+                    headers: Object.assign(getHeaders(), { 'Idempotency-Key': generateIdempotencyKey() }),
+                    body: JSON.stringify({
+                        helpline_session_id: sid,
+                        category: document.getElementById('complaintCategory').value,
+                        description: desc,
+                        crop: document.getElementById('complaintCrop').value || null,
+                        district: document.getElementById('complaintDistrict').value || null,
+                        urgency: document.getElementById('complaintUrgency').value
+                    })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    document.getElementById('referenceNumber').value = data.reference_number;
+                    showResult('complaintResult', data);
+                    loadHistory();
+                } else {
+                    showError('complaintResult', 'Error: ' + JSON.stringify(data, null, 2));
+                }
+            } catch (err) {
+                showError('complaintResult', 'Network error: ' + err.message);
+            }
+        }
+
+        async function listComplaints() {
+            try {
+                const response = await fetch(API_BASE + '/complaints?limit=50&offset=0', { headers: getHeaders() });
+                const data = await response.json();
+                if (response.ok) showResult('complaintResult', data);
+                else showError('complaintResult', 'Error: ' + JSON.stringify(data, null, 2));
+            } catch (err) {
+                showError('complaintResult', 'Network error: ' + err.message);
+            }
+        }
+
+        async function getComplaint() {
+            const ref = document.getElementById('referenceNumber').value;
+            if (!ref) { showError('complaintResult', 'Enter Reference Number'); return; }
+            try {
+                const response = await fetch(API_BASE + '/complaints/' + ref, { headers: getHeaders() });
+                const data = await response.json();
+                if (response.ok) showResult('complaintResult', data);
+                else showError('complaintResult', 'Error: ' + JSON.stringify(data, null, 2));
+            } catch (err) {
+                showError('complaintResult', 'Network error: ' + err.message);
+            }
+        }
+
+        async function loadHistory() {
+            const container = document.getElementById('historyContainer');
+            try {
+                const response = await fetch(API_BASE + '/complaints?limit=20&offset=0', { headers: getHeaders() });
+                const data = await response.json();
+                if (response.ok && data.items && data.items.length > 0) {
+                    container.innerHTML = data.items.map(function(item) {
+                        return '<div class="history-item">' +
+                            '<h4>' + item.reference_number + '</h4>' +
+                            '<div>' +
+                                '<span class="badge badge-' + item.urgency + '">' + item.urgency.toUpperCase() + '</span>' +
+                                '<span class="badge badge-' + item.status + '">' + item.status.toUpperCase() + '</span>' +
+                                '<span class="badge">' + item.category + '</span>' +
+                            '</div>' +
+                            '<p style="margin-top:10px;color:#666;">' + item.description + '</p>' +
+                            (item.crop ? '<p style="margin-top:5px;font-size:13px;"><strong>Crop:</strong> ' + item.crop + '</p>' : '') +
+                            (item.district ? '<p style="font-size:13px;"><strong>District:</strong> ' + item.district + '</p>' : '') +
+                            '<p style="margin-top:5px;font-size:12px;color:#999;">Created: ' + new Date(item.created_at).toLocaleString() + '</p>' +
+                        '</div>';
+                    }).join('');
+                } else if (response.ok) {
+                    container.innerHTML = '<p style="color:#666;text-align:center;">No complaints found</p>';
+                } else {
+                    container.innerHTML = '<p style="color:#dc3545;">Error loading history</p>';
+                }
+            } catch (err) {
+                container.innerHTML = '<p style="color:#dc3545;">Network error: ' + err.message + '</p>';
+            }
+        }
+
+        window.addEventListener('load', loadHistory);
+    </script>
+</body>
+</html>

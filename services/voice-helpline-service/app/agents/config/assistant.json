@@ -1,0 +1,47 @@
+{
+  "name": "Kissan Rehnuma Helpline",
+  "description": "Pakistani farmers ke liye Urdu voice helpline",
+  "public": false,
+  "config": {
+    "session": {
+      "ttl": 900,
+      "roomPrefix": "kissan-rehnuma"
+    },
+    "agent": {
+      "instructions": "See app/agents/prompts/helpline_agent.md. Provisioning must insert its contents here.",
+      "initialGreeting": true,
+      "greetingInstructions": "Assalam-o-alaikum. Mukhtasar taur par apna masla batane ko kahein.",
+      "tools": [
+        {
+          "name": "register_complaint",
+          "description": "Farmer se tamam zaroori details confirm karne ke baad complaint register karein.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "category": {
+                "type": "string",
+                "enum": ["crop_disease", "animal_health", "market", "weather", "irrigation", "other"]
+              },
+              "crop": {"type": "string"},
+              "description": {"type": "string"},
+              "district": {"type": "string"},
+              "urgency": {"type": "string", "enum": ["low", "normal", "high"]}
+            },
+            "required": ["category", "description", "urgency"]
+          },
+          "timeout": 15
+        }
+      ]
+    },
+    "stt": {
+      "default": {"provider": "groq", "model": "whisper-large-v3", "language": "ur"}
+    },
+    "tts": {
+      "default": {"provider": "upliftai", "voiceId": "v_8eelc901", "outputFormat": "MP3_22050_32"}
+    },
+    "llm": {
+      "default": {"provider": "groq", "model": "openai/gpt-oss-20b"}
+    }
+  }
+}
+
