@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kissan Rehnuma Voice Agent Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .status.disconnected {
+            background: #fee;
+            color: #c33;
+            border: 1px solid #fcc;
+        }
+        
+        .status.connecting {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            flex: 1;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .btn-connect {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-connect:hover:not(:disabled) {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-disconnect {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .btn-disconnect:hover:not(:disabled) {
+            background: #c0392b;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4);
+        }
+        
+        .logs {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        
+        .log-entry {
+            padding: 5px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+        
+        .log-time {
+            color: #6c757d;
+            margin-right: 10px;
+        }
+        
+        .log-info {
+            color: #007bff;
+        }
+        
+        .log-success {
+            color: #28a745;
+            font-weight: 600;
+        }
+        
+        .log-error {
+            color: #dc3545;
+            font-weight: 600;
+        }
+        
+        .log-warning {
+            color: #ffc107;
+        }
+        
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        
+        .info-box h3 {
+            color: #1976D2;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        .info-box ul {
+            margin-left: 20px;
+            font-size: 13px;
+            color: #555;
+        }
+        
+        .info-box li {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌾 Kissan Rehnuma</h1>
+        <p class="subtitle">Voice Agent Test Interface</p>
+        
+        <div class="info-box">
+            <h3>📞 How to Test:</h3>
+            <ul>
+                <li>Click "Connect" to start a voice session</li>
+                <li>Allow microphone access when prompted</li>
+                <li>Speak in Roman Urdu (e.g., "Mujhe gandum ki fasal mein bimari lag gayi hai")</li>
+                <li>The agent will respond in Roman Urdu</li>
+                <li>Try registering a complaint or asking about weather/market rates</li>
+            </ul>
+        </div>
+        
+        <div id="status" class="status disconnected">
+            ● Disconnected
+        </div>
+        
+        <div class="controls">
+            <button id="connectBtn" class="btn-connect">Connect</button>
+            <button id="disconnectBtn" class="btn-disconnect" disabled>Disconnect</button>
+        </div>
+        
+        <div class="logs" id="logs"></div>
+    </div>
+    
+    <script type="module">
+        import { Room, RoomEvent, createLocalAudioTrack } from 'https://cdn.jsdelivr.net/npm/livekit-client@2.8.0/dist/livekit-client.esm.mjs';
+        
+        // Configuration
+        const LIVEKIT_URL = 'wss://kissan-rehnuma-xa9jeu4t.livekit.cloud';
+        const TOKEN_ENDPOINT = 'http://localhost:8080/token'; // You'll need to generate tokens
+        
+        let room = null;
+        let localAudioTrack = null;
+        
+        // DOM elements
+        const statusEl = document.getElementById('status');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const logsEl = document.getElementById('logs');
+        
+        // Logging
+        function log(message, type = 'info') {
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-time">[${time}]</span><span class="log-${type}">${message}</span>`;
+            logsEl.appendChild(entry);
+            logsEl.scrollTop = logsEl.scrollHeight;
+        }
+        
+        function updateStatus(status, text) {
+            statusEl.className = `status ${status}`;
+            statusEl.innerHTML = `● ${text}`;
+        }
+        
+        // Generate a simple token (for testing only - use proper auth in production)
+        async function getToken(identity) {
+            // For testing, we'll use a simple approach
+            // In production, call your backend to generate a JWT token
+            log('Getting access token...', 'info');
+            
+            // You need to implement token generation on your backend
+            // For now, generate a temporary token using LiveKit CLI or server SDK
+            const response = await fetch(`${TOKEN_ENDPOINT}?identity=${identity}`);
+            if (!response.ok) {
+                throw new Error('Failed to get token. Make sure token server is running.');
+            }
+            const data = await response.json();
+            return data.token;
+        }
+        
+        // Connect to LiveKit room
+        async function connect() {
+            try {
+                connectBtn.disabled = true;
+                updateStatus('connecting', 'Connecting...');
+                log('Initializing connection...', 'info');
+                console.log('Starting connection process...');
+                
+                // Get local audio track
+                log('Requesting microphone access...', 'info');
+                localAudioTrack = await createLocalAudioTrack();
+                log('Microphone access granted', 'success');
+                console.log('Local audio track created');
+                
+                // Generate token
+                const identity = `farmer_${Date.now()}`;
+                console.log('Requesting token for identity:', identity);
+                const token = await getToken(identity);
+                log('Access token received', 'success');
+                console.log('Token received, length:', token?.length);
+                
+                // Create and connect to room
+                room = new Room({
+                    adaptiveStream: true,
+                    dynacast: true,
+                });
+                console.log('Room instance created');
+                
+                // Set up event handlers
+                room.on(RoomEvent.Connected, () => {
+                    updateStatus('connected', 'Connected - Agent is ready!');
+                    log('Successfully connected to voice agent', 'success');
+                    connectBtn.disabled = true;
+                    disconnectBtn.disabled = false;
+                });
+                
+                room.on(RoomEvent.Disconnected, (reason) => {
+                    updateStatus('disconnected', 'Disconnected');
+                    log(`Disconnected: ${reason || 'Unknown reason'}`, 'warning');
+                    connectBtn.disabled = false;
+                    disconnectBtn.disabled = true;
+                    room = null;
+                });
+                
+                room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+                    if (track.kind === 'audio') {
+                        log('Agent audio track received', 'success');
+                        track.attach(); // Auto-play audio
+                    }
+                });
+                
+                room.on(RoomEvent.DataReceived, (payload, participant) => {
+                    const message = new TextDecoder().decode(payload);
+                    log(`Agent message: ${message}`, 'info');
+                });
+                
+                room.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
+                    if (speakers.length > 0) {
+                        const speakerNames = speakers.map(s => s.identity).join(', ');
+                        log(`Speaking: ${speakerNames}`, 'info');
+                    }
+                });
+                
+                // Connect to room
+                log('Connecting to LiveKit room...', 'info');
+                console.log('Calling room.connect with URL:', LIVEKIT_URL);
+                await room.connect(LIVEKIT_URL, token);
+                console.log('room.connect() completed successfully');
+                
+                // Publish local audio
+                log('Publishing microphone audio...', 'info');
+                await room.localParticipant.publishTrack(localAudioTrack);
+                console.log('Audio track published');
+                log('Audio published successfully', 'success');
+                
+            } catch (error) {
+                console.error('Connection error:', error);
+                log(`Connection failed: ${error.message}`, 'error');
+                updateStatus('disconnected', 'Connection failed');
+                connectBtn.disabled = false;
+            }
+        }
+        
+        // Disconnect from room
+        async function disconnect() {
+            try {
+                log('Disconnecting...', 'info');
+                if (room) {
+                    await room.disconnect();
+                }
+                if (localAudioTrack) {
+                    localAudioTrack.stop();
+                    localAudioTrack = null;
+                }
+                updateStatus('disconnected', 'Disconnected');
+                log('Disconnected successfully', 'success');
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+            } catch (error) {
+                log(`Disconnect error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Event listeners
+        connectBtn.addEventListener('click', connect);
+        disconnectBtn.addEventListener('click', disconnect);
+        
+        // Initial log
+        log('Voice agent test interface ready', 'info');
+        log('Click "Connect" to start', 'info');
+    </script>
+</body>
+</html>
