@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kissan Rehnuma — Crop Disease Detection</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: #f0f4f0;
+            color: #1a2e1a;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2d5a27 0%, #1a3a15 100%);
+            color: white;
+            padding: 1.5rem 2rem;
+            text-align: center;
+        }
+
+        .header h1 { font-size: 1.6rem; margin-bottom: 0.3rem; }
+        .header p { opacity: 0.85; font-size: 0.9rem; }
+
+        .container {
+            max-width: 900px;
+            margin: 2rem auto;
+            padding: 0 1.5rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+
+        .card h2 {
+            font-size: 1.1rem;
+            color: #2d5a27;
+            margin-bottom: 1.2rem;
+            padding-bottom: 0.6rem;
+            border-bottom: 2px solid #e8f0e8;
+        }
+
+        .form-group { margin-bottom: 1rem; }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.4rem;
+            font-size: 0.85rem;
+            color: #444;
+        }
+
+        .form-group select,
+        .form-group input[type="text"] {
+            width: 100%;
+            padding: 0.6rem 0.8rem;
+            border: 1px solid #d0d8d0;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            transition: border-color 0.2s;
+        }
+
+        .form-group select:focus,
+        .form-group input[type="text"]:focus {
+            outline: none;
+            border-color: #2d5a27;
+        }
+
+        .upload-zone {
+            border: 2px dashed #b0c4b0;
+            border-radius: 12px;
+            padding: 2.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #f8faf8;
+        }
+
+        .upload-zone:hover { border-color: #2d5a27; background: #f0f6f0; }
+        .upload-zone.dragover { border-color: #2d5a27; background: #e8f4e8; }
+
+        .upload-zone .icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .upload-zone .text { color: #666; font-size: 0.9rem; }
+        .upload-zone .hint { color: #999; font-size: 0.8rem; margin-top: 0.3rem; }
+
+        .preview-container {
+            margin-top: 1rem;
+            display: none;
+            text-align: center;
+        }
+
+        .preview-container img {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .preview-container .file-name {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 0.5rem;
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 0.9rem;
+            background: linear-gradient(135deg, #2d5a27, #3a7a32);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            margin-top: 1rem;
+        }
+
+        .btn-submit:hover { opacity: 0.9; }
+        .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #e0e8e0;
+            border-top-color: #2d5a27;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .result { display: none; }
+
+        .result-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.2rem;
+        }
+
+        .confidence-badge {
+            padding: 0.4rem 1rem;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            white-space: nowrap;
+        }
+
+        .confidence-high { background: #e6f4e6; color: #1a6b1a; }
+        .confidence-low { background: #fff3e0; color: #e65100; }
+        .confidence-none { background: #fce4ec; color: #c62828; }
+
+        .disease-name { font-size: 1.3rem; font-weight: 700; color: #1a2e1a; }
+        .scientific-name { font-style: italic; color: #666; font-size: 0.9rem; }
+
+        .section { margin-bottom: 1.2rem; }
+
+        .section h3 {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #2d5a27;
+            margin-bottom: 0.5rem;
+        }
+
+        .section ul { padding-left: 1.2rem; }
+
+        .section li {
+            margin-bottom: 0.3rem;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .treatment-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .treatment-box {
+            background: #f8faf8;
+            border-radius: 8px;
+            padding: 1rem;
+            border: 1px solid #e8f0e8;
+        }
+
+        .treatment-box h4 {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            color: #555;
+            margin-bottom: 0.5rem;
+        }
+
+        .cost-banner {
+            background: #f0f6f0;
+            border-radius: 8px;
+            padding: 0.8rem 1rem;
+            margin-top: 0.8rem;
+            font-size: 0.9rem;
+        }
+
+        .cost-banner strong { color: #2d5a27; }
+
+        .message-box {
+            padding: 1.2rem;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .message-info { background: #e3f2fd; color: #1565c0; border: 1px solid #bbdefb; }
+        .message-warning { background: #fff3e0; color: #e65100; border: 1px solid #ffe0b2; }
+        .message-error { background: #fce4ec; color: #c62828; border: 1px solid #f8bbd0; }
+
+        .raw-json {
+            margin-top: 1rem;
+            background: #1a2e1a;
+            color: #a8d5a2;
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: 'Consolas', monospace;
+            font-size: 0.8rem;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .toggle-json {
+            background: none;
+            border: 1px solid #d0d8d0;
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            color: #666;
+            margin-top: 1rem;
+        }
+
+        .toggle-json:hover { background: #f0f4f0; }
+
+        .history-item {
+            display: flex;
+            gap: 1rem;
+            border: 1px solid #e8f0e8;
+            border-radius: 10px;
+            padding: 1.2rem;
+            margin-bottom: 1rem;
+            background: #fafcfa;
+            transition: box-shadow 0.2s;
+        }
+
+        .history-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+
+        .history-thumb {
+            flex-shrink: 0;
+            width: 90px;
+            height: 90px;
+            border-radius: 8px;
+            object-fit: cover;
+            border: 1px solid #e0e0e0;
+        }
+
+        .history-body { flex: 1; min-width: 0; }
+
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.6rem;
+        }
+
+        .history-disease { font-size: 1.05rem; font-weight: 700; color: #1a2e1a; }
+        .history-scientific { font-style: italic; color: #666; font-size: 0.82rem; }
+        .history-meta { font-size: 0.78rem; color: #888; margin-top: 0.3rem; }
+        .history-crop { display: inline-block; background: #e8f4e8; color: #2d5a27; padding: 0.15rem 0.6rem; border-radius: 12px; font-size: 0.78rem; font-weight: 600; }
+        .history-symptoms { font-size: 0.85rem; color: #444; margin-top: 0.5rem; line-height: 1.4; }
+        .history-treatment { font-size: 0.85rem; color: #555; margin-top: 0.4rem; line-height: 1.5; background: #f0f6f0; padding: 0.8rem; border-radius: 6px; }
+
+        .status-badge {
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .status-completed { background: #e6f4e6; color: #1a6b1a; }
+        .status-low_confidence { background: #fff3e0; color: #e65100; }
+        .status-not_a_plant { background: #fce4ec; color: #c62828; }
+        .status-failed { background: #fce4ec; color: #c62828; }
+
+        .history-empty { text-align: center; padding: 2rem; color: #888; }
+        .history-refresh { background: none; border: 1px solid #d0d8d0; padding: 0.3rem 0.8rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; color: #666; float: right; }
+        .history-refresh:hover { background: #f0f4f0; }
+
+        @media (max-width: 600px) {
+            .treatment-grid { grid-template-columns: 1fr; }
+            .container { padding: 0 1rem; }
+            .card { padding: 1.2rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Kissan Rehnuma — Crop Disease Detection</h1>
+        <p>Upload a crop leaf image to detect diseases</p>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <h2>Upload Image</h2>
+
+            <form id="detectForm">
+                <div class="form-group">
+                    <label for="image">Crop Leaf / Plant Image</label>
+                    <div class="upload-zone" id="dropZone">
+                        <div class="icon">🌿</div>
+                        <div class="text">Click to select or drag & drop an image</div>
+                        <div class="hint">JPEG, PNG, WebP — max 10MB</div>
+                        <input type="file" id="image" name="image" accept="image/jpeg,image/png,image/webp" hidden>
+                    </div>
+                    <div class="preview-container" id="preview">
+                        <img id="previewImg" alt="Preview">
+                        <div class="file-name" id="fileName"></div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="user_id">User ID (optional)</label>
+                    <input type="text" id="user_id" name="user_id" placeholder="e.g. farmer_001">
+                </div>
+
+                <div class="form-group">
+                    <label for="language">Response Language</label>
+                    <select id="language" name="language">
+                        <option value="en" selected>English</option>
+                        <option value="ur">Urdu (Roman)</option>
+                        <option value="pa">Punjabi</option>
+                        <option value="sd">Sindhi</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn-submit" id="submitBtn" disabled>Detect Disease</button>
+            </form>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Analyzing image with AI...</p>
+        </div>
+
+        <div class="card result" id="result">
+            <h2>Diagnosis Result</h2>
+            <div id="resultContent"></div>
+            <button class="toggle-json" id="toggleJson">Show Raw JSON</button>
+            <div class="raw-json" id="rawJson" style="display:none;"></div>
+        </div>
+
+        <div class="card" id="historySection">
+            <h2>Scan History <button class="history-refresh" id="refreshHistory">Refresh</button></h2>
+            <div id="historyList"><div class="history-empty">Loading...</div></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('image');
+        const preview = document.getElementById('preview');
+        const previewImg = document.getElementById('previewImg');
+        const fileName = document.getElementById('fileName');
+        const submitBtn = document.getElementById('submitBtn');
+        const form = document.getElementById('detectForm');
+        const loading = document.getElementById('loading');
+        const result = document.getElementById('result');
+        const resultContent = document.getElementById('resultContent');
+        const rawJson = document.getElementById('rawJson');
+        const toggleJson = document.getElementById('toggleJson');
+
+        let selectedFile = null;
+
+        // ── File selection ──
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+        });
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length) handleFile(fileInput.files[0]);
+        });
+
+        function handleFile(file) {
+            if (!file.type.match(/^image\/(jpeg|png|webp)$/)) {
+                alert('Please select a JPEG, PNG, or WebP image.');
+                return;
+            }
+            selectedFile = file;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImg.src = e.target.result;
+                preview.style.display = 'block';
+                fileName.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`;
+                dropZone.style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+            submitBtn.disabled = false;
+        }
+
+        // ── Form submit ──
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!selectedFile) return;
+
+            const formData = new FormData();
+            formData.append('image', selectedFile);
+            formData.append('user_id', document.getElementById('user_id').value || '');
+            formData.append('language', document.getElementById('language').value);
+
+            submitBtn.disabled = true;
+            loading.style.display = 'block';
+            result.style.display = 'none';
+            rawJson.style.display = 'none';
+            toggleJson.textContent = 'Show Raw JSON';
+
+            try {
+                const resp = await fetch(`${API_BASE}/api/v1/disease/detect`, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                const data = await resp.json();
+
+                if (!resp.ok) {
+                    throw new Error(data.detail || `HTTP ${resp.status}`);
+                }
+
+                renderResult(data);
+            } catch (err) {
+                resultContent.innerHTML = `<div class="message-box message-error"><strong>Error:</strong> ${err.message}</div>`;
+                result.style.display = 'block';
+            } finally {
+                loading.style.display = 'none';
+                submitBtn.disabled = false;
+            }
+        });
+
+        // ── Render result ──
+        function renderResult(data) {
+            rawJson.textContent = JSON.stringify(data, null, 2);
+
+            // Not a plant
+            if (!data.is_plant) {
+                resultContent.innerHTML = `<div class="message-box message-warning">${data.message || 'No plant detected.'}</div>`;
+                result.style.display = 'block';
+                return;
+            }
+
+            // Low confidence
+            if (data.confidence !== null && data.confidence < 0.70) {
+                resultContent.innerHTML = `
+                    <div class="message-box message-warning">
+                        <strong>Low Confidence (${(data.confidence * 100).toFixed(0)}%)</strong><br>
+                        ${data.message || 'Image is not clear enough for a reliable diagnosis.'}
+                    </div>`;
+                result.style.display = 'block';
+                return;
+            }
+
+            // Successful diagnosis
+            const confClass = data.confidence >= 0.85 ? 'confidence-high' : data.confidence >= 0.70 ? 'confidence-low' : 'confidence-none';
+            const confPct = data.confidence !== null ? `${(data.confidence * 100).toFixed(0)}%` : 'N/A';
+
+            let html = `
+                <div class="result-header">
+                    <div>
+                        <div class="disease-name">${data.disease_name || 'Unknown'}</div>
+                        <div class="scientific-name">${data.scientific_name || ''}</div>
+                    </div>
+                    <span class="confidence-badge ${confClass}">${confPct} confidence</span>
+                </div>`;
+
+            if (data.crop_type) {
+                html += `<div class="section"><h3>Crop</h3><p>${data.crop_type}</p></div>`;
+            }
+
+            if (data.symptoms && data.symptoms.length) {
+                html += `<div class="section"><h3>Symptoms</h3><ul>${data.symptoms.map(s => `<li>${s}</li>`).join('')}</ul></div>`;
+            }
+
+            if (data.causes) {
+                html += `<div class="section"><h3>Causes</h3><p style="font-size:0.9rem;line-height:1.5;">${data.causes}</p></div>`;
+            }
+
+            if (data.treatment_recommendations) {
+                html += `<div class="section"><h3>Treatment</h3><p style="font-size:0.9rem;line-height:1.6;">${data.treatment_recommendations}</p></div>`;
+            }
+
+            if (data.prevention_tips && data.prevention_tips.length) {
+                html += `<div class="section"><h3>Prevention Tips</h3><ul>${data.prevention_tips.map(t => `<li>${t}</li>`).join('')}</ul></div>`;
+            }
+
+            if (data.affected_crops) {
+                html += `<div class="section"><h3>Affected Crops</h3><p style="font-size:0.9rem;line-height:1.5;">${data.affected_crops}</p></div>`;
+            }
+
+            if (data.image_url) {
+                html += `<div class="section"><h3>Stored Image</h3><p><a href="${data.image_url}" target="_blank" style="color:#2d5a27;">View on Cloudinary</a></p></div>`;
+            }
+
+            resultContent.innerHTML = html;
+            result.style.display = 'block';
+        }
+
+        // ── Toggle JSON ──
+        toggleJson.addEventListener('click', () => {
+            const visible = rawJson.style.display !== 'none';
+            rawJson.style.display = visible ? 'none' : 'block';
+            toggleJson.textContent = visible ? 'Show Raw JSON' : 'Hide Raw JSON';
+        });
+
+        // ── Scan History ──
+        const historyList = document.getElementById('historyList');
+        const refreshHistory = document.getElementById('refreshHistory');
+
+        async function loadHistory() {
+            try {
+                const resp = await fetch(`${API_BASE}/api/v1/disease/history`);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                renderHistory(data);
+            } catch (err) {
+                historyList.innerHTML = `<div class="history-empty">Could not load history: ${err.message}</div>`;
+            }
+        }
+
+        function renderHistory(scans) {
+            if (!scans || scans.length === 0) {
+                historyList.innerHTML = '<div class="history-empty">No scans yet. Upload an image above to get started.</div>';
+                return;
+            }
+
+            let html = '';
+            for (const s of scans) {
+                const confPct = s.confidence !== null ? `${(s.confidence * 100).toFixed(0)}%` : 'N/A';
+                const statusClass = `status-${s.status || 'failed'}`;
+                const date = s.created_at ? new Date(s.created_at).toLocaleString() : '';
+
+                html += `<div class="history-item">`;
+                html += `<img class="history-thumb" src="${s.image_url || ''}" alt="Scan" onerror="this.style.display='none'">`;
+                html += `<div class="history-body">`;
+                html += `<div class="history-header">`;
+                html += `<div><span class="history-disease">${s.disease_name || 'Unknown'}</span>`;
+                if (s.scientific_name) html += `<br><span class="history-scientific">${s.scientific_name}</span>`;
+                html += `</div>`;
+                html += `<span class="status-badge ${statusClass}">${confPct} &middot; ${s.status || ''}</span>`;
+                html += `</div>`;
+
+                html += `<div class="history-meta">`;
+                if (s.crop_type) html += `<span class="history-crop">${s.crop_type}</span> `;
+                html += `<span>${date}</span>`;
+                if (s.user_id) html += ` &middot; ${s.user_id}`;
+                html += `</div>`;
+
+                if (s.symptoms && s.symptoms.length) {
+                    html += `<div class="history-symptoms"><strong>Symptoms:</strong> ${s.symptoms.join('; ')}</div>`;
+                }
+
+                if (s.treatment_recommendations) {
+                    html += `<div class="history-treatment"><strong>Treatment:</strong> ${s.treatment_recommendations.substring(0, 300)}${s.treatment_recommendations.length > 300 ? '...' : ''}</div>`;
+                }
+
+                html += `</div>`; // close history-body
+                html += `</div>`; // close history-item
+            }
+
+            historyList.innerHTML = html;
+        }
+
+        refreshHistory.addEventListener('click', loadHistory);
+
+        // Load history on page load
+        loadHistory();
+
+        // Refresh history after a successful scan
+        const origRender = renderResult;
+        renderResult = function(data) {
+            origRender(data);
+            loadHistory();
+        };
+    </script>
+</body>
+</html>
