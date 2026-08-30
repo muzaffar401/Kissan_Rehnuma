@@ -22,6 +22,8 @@ from app.core.security import (
     create_access_token
 )
 
+from app.core.email import send_otp_email
+
 
 router = APIRouter(
     prefix="/auth",
@@ -41,10 +43,14 @@ signup_otps = {}
 # =========================================================
 
 @router.post("/signup")
-def signup(
+async def signup(
     user: SignupRequest,
     db: Session = Depends(get_db)
 ):
+
+    # ---------------------------------------------------------
+    # CHECK EMAIL
+    # ---------------------------------------------------------
 
     existing_email = db.query(Farmer).filter(
         Farmer.email == user.email
@@ -56,6 +62,10 @@ def signup(
             detail="Email already registered"
         )
 
+    # ---------------------------------------------------------
+    # CHECK CNIC
+    # ---------------------------------------------------------
+
     existing_cnic = db.query(Farmer).filter(
         Farmer.cnic == user.cnic
     ).first()
@@ -65,6 +75,10 @@ def signup(
             status_code=400,
             detail="CNIC already registered"
         )
+
+    # ---------------------------------------------------------
+    # CHECK MOBILE
+    # ---------------------------------------------------------
 
     existing_mobile = db.query(Farmer).filter(
         Farmer.Mobile_Number == user.Mobile_Number
@@ -76,7 +90,10 @@ def signup(
             detail="Mobile number already registered"
         )
 
-    # Create farmer
+    # ---------------------------------------------------------
+    # CREATE FARMER
+    # ---------------------------------------------------------
+
     farmer = Farmer(
         name=user.name,
         email=user.email,
@@ -98,7 +115,10 @@ def signup(
     db.commit()
     db.refresh(farmer)
 
-    # Generate signup OTP
+    # ---------------------------------------------------------
+    # GENERATE SIGNUP OTP
+    # ---------------------------------------------------------
+
     otp = str(random.randint(100000, 999999))
 
     # OTP valid for 10 minutes
@@ -109,11 +129,22 @@ def signup(
         "expires_at": expires_at
     }
 
-    # TEMPORARY
-    # Later we will send this through email
-    print(f"================================")
+    # ---------------------------------------------------------
+    # SEND OTP THROUGH GMAIL
+    # ---------------------------------------------------------
+
+    await send_otp_email(
+        to_email=user.email,
+        otp=otp,
+        subject="Kissan Rehnuma - Email Verification OTP",
+        purpose="email verification"
+    )
+
+    # TEMPORARY DEBUG
+    # You can remove these prints later.
+    print("================================")
     print(f"SIGNUP OTP FOR {user.email}: {otp}")
-    print(f"================================")
+    print("================================")
 
     return {
         "message": "Farmer registered successfully. OTP sent to email.",
@@ -132,6 +163,10 @@ def verify_signup_otp(
     db: Session = Depends(get_db)
 ):
 
+    # ---------------------------------------------------------
+    # GET OTP
+    # ---------------------------------------------------------
+
     otp_data = signup_otps.get(request.email)
 
     if not otp_data:
@@ -140,7 +175,10 @@ def verify_signup_otp(
             detail="OTP not found or expired"
         )
 
-    # Check expiry
+    # ---------------------------------------------------------
+    # CHECK EXPIRY
+    # ---------------------------------------------------------
+
     if otp_data["expires_at"] < datetime.utcnow():
 
         del signup_otps[request.email]
@@ -150,14 +188,20 @@ def verify_signup_otp(
             detail="OTP has expired"
         )
 
-    # Check OTP
+    # ---------------------------------------------------------
+    # CHECK OTP
+    # ---------------------------------------------------------
+
     if otp_data["otp"] != request.otp:
         raise HTTPException(
             status_code=400,
             detail="Invalid OTP"
         )
 
-    # Find farmer
+    # ---------------------------------------------------------
+    # FIND FARMER
+    # ---------------------------------------------------------
+
     farmer = db.query(Farmer).filter(
         Farmer.email == request.email
     ).first()
@@ -168,13 +212,19 @@ def verify_signup_otp(
             detail="User not found"
         )
 
-    # Mark email verified
+    # ---------------------------------------------------------
+    # MARK EMAIL VERIFIED
+    # ---------------------------------------------------------
+
     farmer.email_verified = True
 
     db.commit()
     db.refresh(farmer)
 
-    # Delete OTP after successful verification
+    # ---------------------------------------------------------
+    # DELETE OTP
+    # ---------------------------------------------------------
+
     del signup_otps[request.email]
 
     return {
@@ -194,6 +244,10 @@ def login(
     db: Session = Depends(get_db)
 ):
 
+    # ---------------------------------------------------------
+    # FIND FARMER
+    # ---------------------------------------------------------
+
     farmer = db.query(Farmer).filter(
         Farmer.email == user.email
     ).first()
@@ -203,6 +257,10 @@ def login(
             status_code=401,
             detail="Invalid email or password"
         )
+
+    # ---------------------------------------------------------
+    # CHECK PASSWORD
+    # ---------------------------------------------------------
 
     password_valid = verify_password(
         user.password,
@@ -215,12 +273,19 @@ def login(
             detail="Invalid email or password"
         )
 
-    # Email verification check
+    # ---------------------------------------------------------
+    # CHECK EMAIL VERIFIED
+    # ---------------------------------------------------------
+
     if not farmer.email_verified:
         raise HTTPException(
             status_code=403,
             detail="Please verify your email before login"
         )
+
+    # ---------------------------------------------------------
+    # CREATE ACCESS TOKEN
+    # ---------------------------------------------------------
 
     access_token = create_access_token({
         "sub": str(farmer.id),
@@ -239,10 +304,14 @@ def login(
 # =========================================================
 
 @router.post("/forgot-password")
-def forgot_password(
+async def forgot_password(
     request: ForgotPasswordRequest,
     db: Session = Depends(get_db)
 ):
+
+    # ---------------------------------------------------------
+    # FIND FARMER
+    # ---------------------------------------------------------
 
     farmer = db.query(Farmer).filter(
         Farmer.email == request.email
@@ -254,11 +323,18 @@ def forgot_password(
             detail="Email not registered"
         )
 
-    # Generate 6 digit OTP
+    # ---------------------------------------------------------
+    # GENERATE 6 DIGIT OTP
+    # ---------------------------------------------------------
+
     otp = str(random.randint(100000, 999999))
 
     # OTP valid for 10 minutes
     expires_at = datetime.utcnow() + timedelta(minutes=10)
+
+    # ---------------------------------------------------------
+    # SAVE OTP
+    # ---------------------------------------------------------
 
     reset_otp = PasswordResetOTP(
         email=request.email,
@@ -269,12 +345,25 @@ def forgot_password(
     db.add(reset_otp)
     db.commit()
 
-    # TEMPORARY
-    # Later this OTP will be sent through email
-    print(f"PASSWORD RESET OTP: {otp}")
+    # ---------------------------------------------------------
+    # SEND OTP THROUGH GMAIL
+    # ---------------------------------------------------------
+
+    await send_otp_email(
+        to_email=request.email,
+        otp=otp,
+        subject="Kissan Rehnuma - Password Reset OTP",
+        purpose="password reset"
+    )
+
+    # TEMPORARY DEBUG
+    # You can remove this later.
+    print("================================")
+    print(f"PASSWORD RESET OTP FOR {request.email}: {otp}")
+    print("================================")
 
     return {
-        "message": "OTP generated successfully"
+        "message": "OTP sent successfully to your email"
     }
 
 
@@ -288,6 +377,10 @@ def verify_otp(
     db: Session = Depends(get_db)
 ):
 
+    # ---------------------------------------------------------
+    # FIND LATEST OTP
+    # ---------------------------------------------------------
+
     reset_otp = db.query(PasswordResetOTP).filter(
         PasswordResetOTP.email == request.email,
         PasswordResetOTP.otp == request.otp
@@ -300,6 +393,10 @@ def verify_otp(
             status_code=400,
             detail="Invalid OTP"
         )
+
+    # ---------------------------------------------------------
+    # CHECK OTP EXPIRY
+    # ---------------------------------------------------------
 
     if reset_otp.expires_at < datetime.utcnow():
         raise HTTPException(
@@ -322,14 +419,20 @@ def reset_password(
     db: Session = Depends(get_db)
 ):
 
-    # Check new password and confirm password
+    # ---------------------------------------------------------
+    # CHECK NEW PASSWORD AND CONFIRM PASSWORD
+    # ---------------------------------------------------------
+
     if request.new_password != request.confirm_password:
         raise HTTPException(
             status_code=400,
             detail="Passwords do not match"
         )
 
-    # Find latest OTP
+    # ---------------------------------------------------------
+    # FIND LATEST OTP
+    # ---------------------------------------------------------
+
     reset_otp = db.query(PasswordResetOTP).filter(
         PasswordResetOTP.email == request.email,
         PasswordResetOTP.otp == request.otp
@@ -343,14 +446,20 @@ def reset_password(
             detail="Invalid OTP"
         )
 
-    # Check OTP expiry
+    # ---------------------------------------------------------
+    # CHECK OTP EXPIRY
+    # ---------------------------------------------------------
+
     if reset_otp.expires_at < datetime.utcnow():
         raise HTTPException(
             status_code=400,
             detail="OTP has expired"
         )
 
-    # Find farmer
+    # ---------------------------------------------------------
+    # FIND FARMER
+    # ---------------------------------------------------------
+
     farmer = db.query(Farmer).filter(
         Farmer.email == request.email
     ).first()
@@ -361,12 +470,18 @@ def reset_password(
             detail="User not found"
         )
 
-    # Update password
+    # ---------------------------------------------------------
+    # UPDATE PASSWORD
+    # ---------------------------------------------------------
+
     farmer.password_hash = hash_password(
         request.new_password
     )
 
-    # Delete used OTP
+    # ---------------------------------------------------------
+    # DELETE USED OTP
+    # ---------------------------------------------------------
+
     db.delete(reset_otp)
 
     db.commit()
