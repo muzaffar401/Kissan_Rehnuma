@@ -24,7 +24,7 @@ import {
   BeVietnamPro_600SemiBold,
 } from '@expo-google-fonts/be-vietnam-pro';
 import { colors } from '../theme/colors';
-import { weatherService, CurrentWeatherResponse, ForecastEntry, AlertHistoryItem } from '../services/weatherService';
+import { weatherService, CurrentWeatherResponse, ForecastEntry, AlertHistoryItem, AdvisoryResponse } from '../services/weatherService';
 import { tokenStorage } from '../services/tokenStorage';
 
 type BottomTab = 'home' | 'disease' | 'weather' | 'market' | 'helpline';
@@ -66,21 +66,7 @@ function getDayLabel(isoTime: string, index: number): string {
   return date.toLocaleDateString('en-US', { weekday: 'short' });
 }
 
-// Derive farmer advice from current weather
-function getFarmerAdvice(current: CurrentWeatherResponse) {
-  const advice: { id: string; type: 'do' | 'dont'; label: string; text: string }[] = [];
-  if (current.rain_mm > 2) {
-    advice.push({ id: '1', type: 'do', label: 'Irrigation', text: 'Hold off on irrigation — rainfall expected. Conserve water.' });
-    advice.push({ id: '2', type: 'dont', label: 'Pesticides', text: 'Postpone pesticide or fertilizer sprays as they may be washed away by rain.' });
-  } else if (current.temperature > 35) {
-    advice.push({ id: '1', type: 'do', label: 'Irrigation', text: 'Good time to irrigate early morning or evening to reduce evaporation.' });
-    advice.push({ id: '2', type: 'dont', label: 'Spraying', text: 'Avoid spraying chemicals during peak heat — it reduces effectiveness.' });
-  } else {
-    advice.push({ id: '1', type: 'do', label: 'Field Work', text: 'Favourable conditions for fieldwork and crop monitoring today.' });
-    advice.push({ id: '2', type: 'do', label: 'Irrigation', text: 'Moderate conditions — irrigate as per crop schedule.' });
-  }
-  return advice;
-}
+// Derive farmer advice from current weather — REMOVED, now LLM-based via backend
 
 export default function WeatherScreen({ onNavigate }: WeatherScreenProps) {
   const { width } = useWindowDimensions();
@@ -89,6 +75,7 @@ export default function WeatherScreen({ onNavigate }: WeatherScreenProps) {
   const [current, setCurrent] = useState<CurrentWeatherResponse | null>(null);
   const [forecast, setForecast] = useState<ForecastEntry[]>([]);
   const [alerts, setAlerts] = useState<AlertHistoryItem[]>([]);
+  const [advice, setAdvice] = useState<AdvisoryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -109,15 +96,18 @@ export default function WeatherScreen({ onNavigate }: WeatherScreenProps) {
       const farmerId = parseInt(userId || '0', 10);
       if (!farmerId) throw new Error('Not logged in');
 
-      const [currentData, forecastData, alertData] = await Promise.all([
+      // All 4 calls run in parallel — advisory is cached server-side (30 min TTL)
+      const [currentData, forecastData, alertData, advisoryData] = await Promise.all([
         weatherService.getCurrentWeather(farmerId),
         weatherService.getForecast(farmerId),
         weatherService.getAlertHistory(farmerId),
+        weatherService.getAdvisory(farmerId).catch(() => null),
       ]);
 
       setCurrent(currentData);
-      setForecast(forecastData.forecast.slice(0, 5)); // show first 5 entries
-      setAlerts(alertData.alerts.slice(0, 3)); // show latest 3 alerts
+      setForecast(forecastData.forecast.slice(0, 5));
+      setAlerts(alertData.alerts.slice(0, 3));
+      if (advisoryData) setAdvice(advisoryData);
     } catch (e: any) {
       setError(e?.detail || 'Could not load weather data. Please try again.');
     } finally {
@@ -132,7 +122,6 @@ export default function WeatherScreen({ onNavigate }: WeatherScreenProps) {
 
   const isWide = width > 600;
   const contentMaxWidth = isWide ? 672 : width;
-  const farmerAdvice = current ? getFarmerAdvice(current) : [];
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -219,32 +208,29 @@ export default function WeatherScreen({ onNavigate }: WeatherScreenProps) {
               </View>
             )}
 
-            {/* Farmer's Advice */}
-            <View style={styles.section}>
-              <View style={styles.adviceSectionHeader}>
-                <MaterialCommunityIcons name="lightbulb-on" size={22} color={colors.primary} />
-                <Text style={styles.adviceSectionTitle}>Farmer's Advice</Text>
+            {/* Farmer's Advice — LLM Generated */}
+            {advice && (
+              <View style={styles.section}>
+                <View style={styles.adviceSectionHeader}>
+                  <MaterialCommunityIcons name="lightbulb-on" size={22} color={colors.primary} />
+                  <Text style={styles.adviceSectionTitle}>Farmer's Advice</Text>
+                  {advice.source === 'llm' && (
+                    <View style={styles.llmBadge}>
+                      <Text style={styles.llmBadgeText}>AI</Text>
+                    </View>
+                  )}
+                </View>
+                <View style={styles.adviceCard}>
+                  <MaterialCommunityIcons
+                    name="lightbulb-on-outline"
+                    size={28}
+                    color={colors.primary}
+                    style={styles.adviceCardIcon}
+                  />
+                  <Text style={styles.adviceCardText}>{advice.advice}</Text>
+                </View>
               </View>
-              <View style={styles.adviceCard}>
-                {farmerAdvice.map((item, index) => (
-                  <View
-                    key={item.id}
-                    style={[styles.adviceItem, index < farmerAdvice.length - 1 && styles.adviceItemBorder]}
-                  >
-                    <MaterialCommunityIcons
-                      name={item.type === 'do' ? 'check-circle' : 'cancel'}
-                      size={22}
-                      color={colors.tertiaryContainer}
-                      style={styles.adviceIcon}
-                    />
-                    <Text style={styles.adviceText}>
-                      <Text style={styles.adviceLabel}>{item.label}: </Text>
-                      {item.text}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </View>
+            )}
 
             {/* Forecast */}
             {forecast.length > 0 && (
@@ -348,12 +334,11 @@ const styles = StyleSheet.create({
   alertTimestamp: { fontFamily: 'BeVietnamPro_500Medium', fontSize: 12, fontWeight: '500', color: colors.outline, marginTop: 8 },
   adviceSectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   adviceSectionTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 24, fontWeight: '600', color: colors.primary },
-  adviceCard: { backgroundColor: colors.secondaryContainer, borderRadius: 12, padding: 24, borderWidth: 1, borderColor: colors.secondary, shadowColor: '#4A453C', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },
-  adviceItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  adviceItemBorder: { paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(125, 87, 20, 0.15)', marginBottom: 16 },
-  adviceIcon: { marginTop: 2, flexShrink: 0 },
-  adviceText: { fontFamily: 'BeVietnamPro_400Regular', fontSize: 16, fontWeight: '400', color: colors.onSurface, lineHeight: 24, flex: 1 },
-  adviceLabel: { fontWeight: '700', fontFamily: 'BeVietnamPro_600SemiBold' },
+  adviceCard: { backgroundColor: colors.secondaryContainer, borderRadius: 12, padding: 20, borderWidth: 1, borderColor: colors.secondary, shadowColor: '#4A453C', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2, flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  adviceCardIcon: { marginTop: 2, flexShrink: 0 },
+  adviceCardText: { fontFamily: 'BeVietnamPro_400Regular', fontSize: 16, fontWeight: '400', color: colors.onSurface, lineHeight: 26, flex: 1 },
+  llmBadge: { backgroundColor: colors.primaryContainer, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, marginLeft: 4 },
+  llmBadgeText: { fontFamily: 'BeVietnamPro_600SemiBold', fontSize: 10, fontWeight: '600', color: colors.primary },
   forecastScroll: { gap: 12, paddingVertical: 4 },
   forecastCard: { minWidth: 100, alignItems: 'center', padding: 16, backgroundColor: colors.surfaceContainerLowest, borderRadius: 12, borderWidth: 1, borderColor: colors.surfaceVariant, shadowColor: '#4A453C', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2, gap: 8 },
   forecastCardToday: { borderColor: colors.primaryContainer, borderWidth: 2 },

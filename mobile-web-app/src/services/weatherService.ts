@@ -4,6 +4,7 @@
  */
 
 import { api } from './apiClient';
+import { ENDPOINTS } from './config';
 
 // ── Types matching weather-alert-service responses ──────────────────────────
 
@@ -55,6 +56,12 @@ export interface FarmerLocationResponse {
   longitude: number;
 }
 
+export interface AdvisoryResponse {
+  farmer_id: number;
+  advice: string;
+  source: 'llm' | 'static';
+}
+
 // ── Service ──────────────────────────────────────────────────────────────────
 
 export const weatherService = {
@@ -64,24 +71,29 @@ export const weatherService = {
     payload: FarmerLocationRequest,
   ): Promise<FarmerLocationResponse> {
     return api.put<FarmerLocationResponse>(
-      `/farmers/${farmerId}/location`,
+      ENDPOINTS.weather.location(farmerId),
       payload,
     );
   },
 
   /** Get current weather for the farmer's registered location */
   async getCurrentWeather(farmerId: number): Promise<CurrentWeatherResponse> {
-    return api.get<CurrentWeatherResponse>(`/weather/current/${farmerId}`);
+    return api.get<CurrentWeatherResponse>(ENDPOINTS.weather.current(farmerId));
   },
 
   /** Get hourly forecast for the farmer's registered location */
   async getForecast(farmerId: number): Promise<ForecastResponse> {
-    return api.get<ForecastResponse>(`/weather/forecast/${farmerId}`);
+    return api.get<ForecastResponse>(ENDPOINTS.weather.forecast(farmerId));
+  },
+
+  /** Get LLM-generated farming advice based on current weather + forecast */
+  async getAdvisory(farmerId: number): Promise<AdvisoryResponse> {
+    return api.get<AdvisoryResponse>(ENDPOINTS.weather.advisory(farmerId));
   },
 
   /** Get sent alert history for a farmer */
   async getAlertHistory(farmerId: number): Promise<AlertHistoryResponse> {
-    return api.get<AlertHistoryResponse>(`/alerts/history/${farmerId}`);
+    return api.get<AlertHistoryResponse>(ENDPOINTS.weather.alertHistory(farmerId));
   },
 
   /** Register device FCM token for push notifications */

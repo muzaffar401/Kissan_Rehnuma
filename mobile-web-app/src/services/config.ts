@@ -75,6 +75,7 @@ export const ENDPOINTS = {
   weather: {
     current: (farmerId: number) => `/weather/current/${farmerId}`,
     forecast: (farmerId: number) => `/weather/forecast/${farmerId}`,
+    advisory: (farmerId: number) => `/weather/advisory/${farmerId}`,
     location: (farmerId: number) => `/farmers/${farmerId}/location`,
     alertHistory: (farmerId: number) => `/alerts/history/${farmerId}`,
     health: '/weather/health',

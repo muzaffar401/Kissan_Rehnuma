@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Platform, View } from 'react-native';
+import { View } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { colors } from './src/theme/colors';
@@ -27,31 +27,40 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('loading');
 
   useEffect(() => {
-    // ─── DEV MODE: Auto-inject test JWT for testing ───
-    // Remove this block when user-auth-service is connected
-    if (__DEV__ && Platform.OS === 'web') {
-      const hasToken = localStorage.getItem('kissan_access_token');
-      if (!hasToken) {
-        // Generate a test token signed with same secret as gateway
-        localStorage.setItem('kissan_access_token', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0LWZhcm1lci0xMjMiLCJlbWFpbCI6ImFobWFkQHRlc3QuY29tIn0.7l0hyVznm9GKjgt-SDmpNZe0dqDOL10z6WOINYm3lpA');
-        localStorage.setItem('kissan_user_email', 'ahmad@test.com');
-        localStorage.setItem('kissan_user_id', 'test-farmer-123');
-        console.log('[DEV] Test JWT token injected into localStorage');
-      }
-    }
-
-    // Brief delay to let the app fully mount, then hide native splash
-    // and show our JS animated splash
-    const timer = setTimeout(async () => {
+    // ─── Restore session on app start ───
+    // Check if user is already logged in with a valid token.
+    // If yes → skip splash/onboarding/login, go straight to home.
+    const restoreSession = async () => {
       try {
         await SplashScreen.hideAsync();
       } catch {
         // Safe to ignore on web
       }
-      setCurrentScreen('splash');
-    }, 100);
 
-    return () => clearTimeout(timer);
+      const hasValidToken = await tokenStorage.isTokenValid();
+
+      if (hasValidToken) {
+        // Token exists and is not expired → go to home
+        console.log('[App] Valid token found — restoring session');
+        setCurrentScreen('home');
+        return;
+      }
+
+      // No valid token — check if onboarding was already completed
+      const onboardingDone = await tokenStorage.isOnboardingComplete();
+
+      if (onboardingDone) {
+        // User has seen onboarding before but is not logged in → login screen
+        console.log('[App] Onboarding complete, no valid token → login');
+        setCurrentScreen('login');
+      } else {
+        // First time user → show splash → onboarding flow
+        console.log('[App] First time → splash → onboarding');
+        setCurrentScreen('splash');
+      }
+    };
+
+    restoreSession();
   }, []);
 
   const renderScreen = () => {

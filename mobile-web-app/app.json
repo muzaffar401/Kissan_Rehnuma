@@ -34,7 +34,13 @@
         }
       ],
       "expo-secure-store",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Kissan Rehnuma to access your location for weather alerts and crop recommendations."
+        }
+      ]
     ],
     "extra": {
       "eas": {

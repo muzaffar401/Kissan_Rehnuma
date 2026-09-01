@@ -1,6 +1,8 @@
+import random
 from datetime import datetime, timedelta
 from typing import List
 
+from cachetools import TTLCache
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -16,10 +18,20 @@ from app.schemas.weather import (
     ForecastResponse,
     FarmerLocationRequest,
     FarmerLocationResponse,
+    AdvisoryResponse,
 )
-from app.services import weather_provider
+from app.services import weather_provider, llm_advisory
 
 router = APIRouter()
+
+# In-memory cache for LLM advisory responses.
+# 60 min TTL + ±10% jitter — farming advice changes slowly, no need to hit LLM often.
+# Jitter prevents thundering-herd: all entries expiring at the same instant.
+_ADVISORY_BASE_TTL = 60 * 60  # 60 minutes
+_advisory_cache: TTLCache = TTLCache(
+    maxsize=100,
+    ttl=_ADVISORY_BASE_TTL + random.randint(-300, 300),  # ±5 min jitter
+)
 
 
 def _resolve_location(farmer_id: int, db: Session):
@@ -134,3 +146,51 @@ def get_weather_forecast(farmer_id: int, db: Session = Depends(get_db)):
         for h in hours
     ]
     return ForecastResponse(farmer_id=farmer_id, forecast=forecast)
+
+
+@router.get("/weather/advisory/{farmer_id}", response_model=AdvisoryResponse)
+def get_farmer_advisory(farmer_id: int, db: Session = Depends(get_db)):
+    """Generate LLM-based farming advice from current weather + forecast.
+    
+    Results are cached in-memory for WEATHER_CACHE_MINUTES to avoid
+    hitting the LLM API on every request.
+    """
+    # Check cache first
+    cached = _advisory_cache.get(farmer_id)
+    if cached is not None:
+        return cached
+
+    farmer = FarmerRepository(db).get_by_id(farmer_id)
+    if not farmer:
+        raise HTTPException(status_code=404, detail="Farmer not found")
+
+    latitude, longitude = _resolve_location(farmer_id, db)
+
+    try:
+        current = weather_provider.fetch_current_weather(latitude, longitude)
+        forecast = weather_provider.fetch_forecast(
+            latitude, longitude, forecast_hours=FORECAST_HOURS
+        )
+    except weather_provider.WeatherProviderError as exc:
+        raise HTTPException(
+            status_code=502, detail=f"Weather provider unavailable: {exc}"
+        )
+
+    advice = llm_advisory.generate_general_advisory(current, forecast)
+    if advice:
+        response = AdvisoryResponse(
+            farmer_id=farmer_id, advice=advice, source="llm"
+        )
+    else:
+        # Static fallback when LLM is unavailable
+        fallback = (
+            "Mausam ke hisaab se apne khet aur maweshi ka khayal rakhein. "
+            "Zaroorat ke mutabiq paani dein aur spray ka waqt munasib rakhein."
+        )
+        response = AdvisoryResponse(
+            farmer_id=farmer_id, advice=fallback, source="static"
+        )
+
+    # Cache the response
+    _advisory_cache[farmer_id] = response
+    return response

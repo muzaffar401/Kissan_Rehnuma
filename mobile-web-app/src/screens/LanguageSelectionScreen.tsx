@@ -4,6 +4,7 @@ import { useFonts, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold } from '
 import { BeVietnamPro_400Regular, BeVietnamPro_500Medium, BeVietnamPro_600SemiBold } from '@expo-google-fonts/be-vietnam-pro';
 import { NotoNastaliqUrdu_400Regular } from '@expo-google-fonts/noto-nastaliq-urdu';
 import { colors } from '../theme/colors';
+import { tokenStorage } from '../services/tokenStorage';
 
 interface LanguageSelectionScreenProps {
   onComplete: (language: string) => void;
@@ -88,6 +89,7 @@ export default function LanguageSelectionScreen({ onComplete }: LanguageSelectio
 
   const handleContinue = () => {
     if (selected) {
+      tokenStorage.setOnboardingComplete(selected); // persist onboarding + language
       onComplete(selected);
     }
   };

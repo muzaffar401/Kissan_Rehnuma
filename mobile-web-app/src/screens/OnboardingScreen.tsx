@@ -4,6 +4,7 @@ import CrossPager, { CrossPagerRef } from '../components/PagerView';
 import { useFonts, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans';
 import { BeVietnamPro_400Regular, BeVietnamPro_600SemiBold } from '@expo-google-fonts/be-vietnam-pro';
 import { colors } from '../theme/colors';
+import { tokenStorage } from '../services/tokenStorage';
 
 const slides = [
   {
@@ -60,11 +61,13 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
     if (currentPage < slides.length - 1) {
       pagerRef.current?.setPage(currentPage + 1);
     } else {
+      tokenStorage.setOnboardingComplete(); // persist: don't show onboarding again
       onComplete();
     }
   };
 
   const handleSkip = () => {
+    tokenStorage.setOnboardingComplete(); // persist: don't show onboarding again
     onComplete();
   };
 

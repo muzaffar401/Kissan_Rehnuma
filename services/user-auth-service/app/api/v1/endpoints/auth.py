@@ -2,11 +2,13 @@ import random
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.models.farmer import Farmer
 from app.models.password_reset import PasswordResetOTP
+from app.models.signup_otp import SignupOTP
 
 from app.schemas.auth import (
     SignupRequest,
@@ -31,11 +33,25 @@ router = APIRouter(
 )
 
 
-# =========================================================
-# SIGNUP OTP - TEMPORARY STORAGE
-# =========================================================
+def _ensure_farmer_location(db: Session, farmer_id: int, latitude: float, longitude: float):
+    """Register farmer location in farmer_locations if not already present.
 
-signup_otps = {}
+    Both auth-service and weather-service share the same database,
+    so we can directly insert into farmer_locations from here.
+    """
+    result = db.execute(
+        text("SELECT 1 FROM farmer_locations WHERE farmer_id = :fid"),
+        {"fid": farmer_id},
+    )
+    if result.fetchone() is None:
+        db.execute(
+            text(
+                "INSERT INTO farmer_locations (farmer_id, latitude, longitude) "
+                "VALUES (:fid, :lat, :lng)"
+            ),
+            {"fid": farmer_id, "lat": latitude, "lng": longitude},
+        )
+        db.commit()
 
 
 # =========================================================
@@ -104,10 +120,8 @@ async def signup(
         City=user.City,
         country=user.country,
         latitude=user.latitude,
-
+        longitude=user.longitude,
         password_hash=hash_password(user.password),
-
-        # Email initially NOT verified
         email_verified=False
     )
 
@@ -116,18 +130,20 @@ async def signup(
     db.refresh(farmer)
 
     # ---------------------------------------------------------
-    # GENERATE SIGNUP OTP
+    # GENERATE SIGNUP OTP & SAVE TO DB
     # ---------------------------------------------------------
 
     otp = str(random.randint(100000, 999999))
-
-    # OTP valid for 10 minutes
     expires_at = datetime.utcnow() + timedelta(minutes=10)
 
-    signup_otps[user.email] = {
-        "otp": otp,
-        "expires_at": expires_at
-    }
+    signup_otp_record = SignupOTP(
+        email=user.email,
+        otp=otp,
+        expires_at=expires_at,
+        is_used=False
+    )
+    db.add(signup_otp_record)
+    db.commit()
 
     # ---------------------------------------------------------
     # SEND OTP THROUGH GMAIL
@@ -139,12 +155,6 @@ async def signup(
         subject="Kissan Rehnuma - Email Verification OTP",
         purpose="email verification"
     )
-
-    # TEMPORARY DEBUG
-    # You can remove these prints later.
-    print("================================")
-    print(f"SIGNUP OTP FOR {user.email}: {otp}")
-    print("================================")
 
     return {
         "message": "Farmer registered successfully. OTP sent to email.",
@@ -164,38 +174,29 @@ def verify_signup_otp(
 ):
 
     # ---------------------------------------------------------
-    # GET OTP
+    # FIND OTP IN DB
     # ---------------------------------------------------------
 
-    otp_data = signup_otps.get(request.email)
+    signup_otp_record = db.query(SignupOTP).filter(
+        SignupOTP.email == request.email,
+        SignupOTP.otp == request.otp,
+        SignupOTP.is_used == False
+    ).order_by(SignupOTP.id.desc()).first()
 
-    if not otp_data:
+    if not signup_otp_record:
         raise HTTPException(
             status_code=400,
-            detail="OTP not found or expired"
+            detail="Invalid OTP or already used"
         )
 
     # ---------------------------------------------------------
     # CHECK EXPIRY
     # ---------------------------------------------------------
 
-    if otp_data["expires_at"] < datetime.utcnow():
-
-        del signup_otps[request.email]
-
+    if signup_otp_record.expires_at < datetime.utcnow():
         raise HTTPException(
             status_code=400,
             detail="OTP has expired"
-        )
-
-    # ---------------------------------------------------------
-    # CHECK OTP
-    # ---------------------------------------------------------
-
-    if otp_data["otp"] != request.otp:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid OTP"
         )
 
     # ---------------------------------------------------------
@@ -213,24 +214,31 @@ def verify_signup_otp(
         )
 
     # ---------------------------------------------------------
-    # MARK EMAIL VERIFIED
+    # MARK EMAIL VERIFIED & OTP USED
     # ---------------------------------------------------------
 
     farmer.email_verified = True
+    signup_otp_record.is_used = True
 
     db.commit()
     db.refresh(farmer)
 
-    # ---------------------------------------------------------
-    # DELETE OTP
-    # ---------------------------------------------------------
+    # Register location for weather alerts (uses GPS coords from signup)
+    _ensure_farmer_location(db, farmer.id, farmer.latitude, farmer.longitude)
 
-    del signup_otps[request.email]
+    # Auto-login: issue JWT so the user can start using the app immediately
+    access_token = create_access_token({
+        "sub": str(farmer.id),
+        "email": farmer.email
+    })
 
     return {
-        "message": "Email verified successfully. You can now login.",
+        "message": "Email verified successfully.",
+        "farmer_id": farmer.id,
         "email": farmer.email,
-        "email_verified": True
+        "email_verified": True,
+        "access_token": access_token,
+        "token_type": "bearer"
     }
 
 
@@ -282,6 +290,9 @@ def login(
             status_code=403,
             detail="Please verify your email before login"
         )
+
+    # Ensure location is registered for weather alerts
+    _ensure_farmer_location(db, farmer.id, farmer.latitude, farmer.longitude)
 
     # ---------------------------------------------------------
     # CREATE ACCESS TOKEN
@@ -355,12 +366,6 @@ async def forgot_password(
         subject="Kissan Rehnuma - Password Reset OTP",
         purpose="password reset"
     )
-
-    # TEMPORARY DEBUG
-    # You can remove this later.
-    print("================================")
-    print(f"PASSWORD RESET OTP FOR {request.email}: {otp}")
-    print("================================")
 
     return {
         "message": "OTP sent successfully to your email"

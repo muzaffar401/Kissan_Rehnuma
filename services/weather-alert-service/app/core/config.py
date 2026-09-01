@@ -11,7 +11,7 @@ JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 
 # Open-Meteo (free, no API key needed)
 OPEN_METEO_BASE_URL = "https://api.open-meteo.com/v1"
-HTTP_TIMEOUT_SECONDS = float(os.getenv("HTTP_TIMEOUT_SECONDS", "10"))
+HTTP_TIMEOUT_SECONDS = float(os.getenv("HTTP_TIMEOUT_SECONDS", "15"))
 
 # Current weather readings younger than this are served from DB cache
 WEATHER_CACHE_MINUTES = int(os.getenv("WEATHER_CACHE_MINUTES", "30"))
@@ -23,11 +23,14 @@ FORECAST_HOURS = int(os.getenv("FORECAST_HOURS", "48"))
 SCHEDULER_ENABLED = os.getenv("SCHEDULER_ENABLED", "true").lower() == "true"
 SCHEDULER_INTERVAL_MINUTES = int(os.getenv("SCHEDULER_INTERVAL_MINUTES", "30"))
 
-# Optional LLM advisory (OpenAI-compatible). When no key is set, the
-# static Roman-Urdu advisories are used instead.
-LLM_API_KEY = os.getenv("LLM_API_KEY", "")
-LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
-LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
+# LLM advisory via OpenRouter (Gemini). Generates Roman-Urdu agricultural
+# advisories. Falls back to static advisories when the key is missing or
+# the LLM call fails.
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://openrouter.ai/api/v1")
+LLM_MODEL = os.getenv("LLM_MODEL", "google/gemini-2.5-flash")
+LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.3"))
+LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "200"))
 
 # Optional Twilio SMS. When not configured, notifications are logged only.
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID", "")

@@ -43,3 +43,9 @@ class FarmerLocationResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class AdvisoryResponse(BaseModel):
+    farmer_id: int
+    advice: str
+    source: str  # "llm" or "static"

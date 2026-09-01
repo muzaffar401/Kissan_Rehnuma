@@ -40,6 +40,7 @@ export interface SignupRequest {
   City: string;
   country: string;
   latitude: string;
+  longitude: string;
   password: string;
 }
 
@@ -55,6 +56,11 @@ export interface VerifyOtpRequest {
 
 export interface VerifyOtpResponse {
   message: string;
+  farmer_id: number;
+  email: string;
+  email_verified: boolean;
+  access_token: string;
+  token_type: string;
 }
 
 export interface ForgotPasswordRequest {

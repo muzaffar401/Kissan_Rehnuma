@@ -45,8 +45,9 @@ def check_farmer(db: Session, farmer: Farmer) -> TriggerCheckResponse:
             notification_status="not_sent",
         )
 
-    # LLM advisory when configured, static Roman-Urdu advisory otherwise
-    message = llm_advisory.generate_advisory(risk, current) or advisories.build_advisory(
+    # LLM advisory with full weather context (current + forecast)
+    # Falls back to static Roman-Urdu advisory if LLM is unavailable
+    message = llm_advisory.generate_advisory(risk, current, forecast) or advisories.build_advisory(
         risk.risk_type, risk.detail
     )
     status = notifier.send_sms(farmer.phone_number, message)

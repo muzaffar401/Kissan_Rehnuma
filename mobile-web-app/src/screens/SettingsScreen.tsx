@@ -23,6 +23,7 @@ import {
   BeVietnamPro_600SemiBold,
 } from '@expo-google-fonts/be-vietnam-pro';
 import { colors } from '../theme/colors';
+import { tokenStorage } from '../services/tokenStorage';
 
 type BottomTab = 'home' | 'disease' | 'weather' | 'market' | 'helpline';
 
@@ -241,7 +242,13 @@ export default function SettingsScreen({ onNavigate }: SettingsScreenProps) {
         </View>
 
         {/* Logout */}
-        <Pressable style={styles.logoutBtn}>
+        <Pressable
+          style={styles.logoutBtn}
+          onPress={async () => {
+            await tokenStorage.clearAll();
+            onNavigate?.('login');
+          }}
+        >
           <Text style={styles.logoutText}>Logout</Text>
         </Pressable>
       </ScrollView>

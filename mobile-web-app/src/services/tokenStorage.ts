@@ -17,6 +17,8 @@ const KEYS = {
   ACCESS_TOKEN: 'kissan_access_token',
   USER_EMAIL: 'kissan_user_email',
   USER_ID: 'kissan_user_id',
+  ONBOARDING_COMPLETE: 'kissan_onboarding_complete',
+  APP_LANGUAGE: 'kissan_app_language',
 } as const;
 
 /**
@@ -100,6 +102,55 @@ export const tokenStorage = {
   },
 
   /**
+   * Check if the stored JWT token is still valid (not expired).
+   * Decodes the payload without verification — just checks the `exp` claim.
+   * Returns false if no token, expired token, or unparseable token.
+   */
+  async isTokenValid(): Promise<boolean> {
+    const token = await storage.getItem(KEYS.ACCESS_TOKEN);
+    if (!token) return false;
+    try {
+      // JWT = header.payload.signature — decode the payload (part 1)
+      const parts = token.split('.');
+      if (parts.length !== 3) return false;
+      const payload = JSON.parse(atob(parts[1]));
+      if (!payload.exp) return true; // no expiry = valid forever
+      // exp is in seconds, Date.now() is in milliseconds
+      return payload.exp * 1000 > Date.now();
+    } catch {
+      return false;
+    }
+  },
+
+  /**
+   * Mark onboarding as completed (only shown once per device).
+   */
+  async setOnboardingComplete(language?: string): Promise<void> {
+    const promises: Promise<void>[] = [
+      storage.setItem(KEYS.ONBOARDING_COMPLETE, 'true'),
+    ];
+    if (language) {
+      promises.push(storage.setItem(KEYS.APP_LANGUAGE, language));
+    }
+    await Promise.all(promises);
+  },
+
+  /**
+   * Check if onboarding has been completed.
+   */
+  async isOnboardingComplete(): Promise<boolean> {
+    const value = await storage.getItem(KEYS.ONBOARDING_COMPLETE);
+    return value === 'true';
+  },
+
+  /**
+   * Get stored app language.
+   */
+  async getLanguage(): Promise<string | null> {
+    return storage.getItem(KEYS.APP_LANGUAGE);
+  },
+
+  /**
    * Clear all stored auth data (logout).
    */
   async clearAll(): Promise<void> {
@@ -107,6 +158,19 @@ export const tokenStorage = {
       storage.removeItem(KEYS.ACCESS_TOKEN),
       storage.removeItem(KEYS.USER_ID),
       storage.removeItem(KEYS.USER_EMAIL),
+    ]);
+  },
+
+  /**
+   * Clear everything including onboarding flag (full reset).
+   */
+  async clearAllIncludingOnboarding(): Promise<void> {
+    await Promise.all([
+      storage.removeItem(KEYS.ACCESS_TOKEN),
+      storage.removeItem(KEYS.USER_ID),
+      storage.removeItem(KEYS.USER_EMAIL),
+      storage.removeItem(KEYS.ONBOARDING_COMPLETE),
+      storage.removeItem(KEYS.APP_LANGUAGE),
     ]);
   },
 };

@@ -47,6 +47,7 @@ export type {
   AlertHistoryItem,
   FarmerLocationRequest,
   FarmerLocationResponse,
+  AdvisoryResponse,
 } from './weatherService';
 
 export { marketService } from './marketService';

@@ -24,9 +24,42 @@ import {
 } from '@expo-google-fonts/be-vietnam-pro';
 import { colors } from '../theme/colors';
 import { authService } from '../services/authService';
+import { weatherService } from '../services/weatherService';
+import { tokenStorage } from '../services/tokenStorage';
+import * as Location from 'expo-location';
+import {
+  validateEmail,
+  validatePassword,
+  validateCNIC,
+  validatePhone,
+  validateOTP,
+  validateRequired,
+} from '../utils/validation';
+
+/**
+ * Get device location using expo-location (works on native + web).
+ * Requests permission first, falls back to { 0, 0 } if denied or unavailable.
+ */
+async function getDeviceLocation(): Promise<{ latitude: number; longitude: number }> {
+  try {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      return { latitude: 0, longitude: 0 };
+    }
+    const location = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    });
+    return {
+      latitude: location.coords.latitude,
+      longitude: location.coords.longitude,
+    };
+  } catch {
+    return { latitude: 0, longitude: 0 };
+  }
+}
 
 interface LoginSignupScreenProps {
-  onComplete: (mode: 'login' | 'signup' | 'skip') => void;
+  onComplete: (mode: 'login' | 'signup') => void;
 }
 
 function FormInput({
@@ -85,10 +118,12 @@ function FormInput({
 
 function OtpStep({
   email,
+  gpsCoords,
   onVerified,
   onBack,
 }: {
   email: string;
+  gpsCoords: { latitude: number; longitude: number } | null;
   onVerified: () => void;
   onBack: () => void;
 }) {
@@ -97,11 +132,32 @@ function OtpStep({
   const [error, setError] = useState('');
 
   const handleVerify = async () => {
-    if (!otp.trim()) { setError('Please enter the OTP'); return; }
+    const otpError = validateOTP(otp);
+    if (otpError) { setError(otpError); return; }
     setLoading(true);
     setError('');
     try {
-      await authService.verifySignupOtp({ email, otp });
+      const response = await authService.verifySignupOtp({ email, otp });
+
+      // Auto-login: save JWT token
+      if (response.access_token) {
+        await tokenStorage.saveAccessToken(response.access_token);
+        await tokenStorage.saveUserInfo(String(response.farmer_id), response.email);
+      }
+
+      // Register farmer location for weather alerts (non-blocking)
+      if (gpsCoords && response.farmer_id) {
+        try {
+          await weatherService.registerLocation(response.farmer_id, {
+            latitude: gpsCoords.latitude,
+            longitude: gpsCoords.longitude,
+          });
+        } catch {
+          // Location registration failed — user can still use the app,
+          // weather just won't work until location is set
+        }
+      }
+
       onVerified();
     } catch (e: any) {
       setError(e?.detail || 'Invalid OTP. Please try again.');
@@ -140,6 +196,13 @@ export default function LoginSignupScreen({ onComplete }: LoginSignupScreenProps
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Forgot password flow
+  const [forgotStep, setForgotStep] = useState<'email' | 'otp' | null>(null);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [resetOtp, setResetOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
   const [fontsLoaded] = useFonts({
     PlusJakartaSans_600SemiBold,
     PlusJakartaSans_700Bold,
@@ -147,6 +210,9 @@ export default function LoginSignupScreen({ onComplete }: LoginSignupScreenProps
     BeVietnamPro_500Medium,
     BeVietnamPro_600SemiBold,
   });
+
+  // GPS coords stored during signup for location registration after OTP
+  const gpsCoordsRef = useRef<{ latitude: number; longitude: number } | null>(null);
 
   // Login form
   const [loginEmail, setLoginEmail] = useState('');
@@ -168,6 +234,7 @@ export default function LoginSignupScreen({ onComplete }: LoginSignupScreenProps
   const switchTab = (tab: 'login' | 'signup') => {
     setActiveTab(tab);
     setError('');
+    setForgotStep(null);
     Animated.timing(tabPosition, {
       toValue: tab === 'login' ? 0 : 1,
       duration: 250,
@@ -176,11 +243,55 @@ export default function LoginSignupScreen({ onComplete }: LoginSignupScreenProps
     }).start();
   };
 
-  const handleLogin = async () => {
-    if (!loginEmail.trim() || !loginPassword.trim()) {
-      setError('Please enter email and password.');
-      return;
+  // ── Forgot Password handlers ──
+
+  const handleForgotSendOtp = async () => {
+    const emailError = validateEmail(forgotEmail);
+    if (emailError) { setError(emailError); return; }
+    setLoading(true);
+    setError('');
+    try {
+      await authService.forgotPassword({ email: forgotEmail.trim() });
+      setForgotStep('otp');
+    } catch (e: any) {
+      setError(e?.detail || 'Failed to send OTP. Please try again.');
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleResetPassword = async () => {
+    const otpError = validateOTP(resetOtp);
+    if (otpError) { setError(otpError); return; }
+    const pwError = validatePassword(newPassword);
+    if (pwError) { setError(pwError); return; }
+    if (newPassword !== confirmPassword) { setError('Passwords do not match.'); return; }
+    setLoading(true);
+    setError('');
+    try {
+      await authService.resetPassword({
+        email: forgotEmail.trim(),
+        otp: resetOtp.trim(),
+        new_password: newPassword,
+        confirm_password: confirmPassword,
+      });
+      setForgotStep(null);
+      setLoginEmail(forgotEmail.trim());
+      setLoginPassword('');
+      setError('');
+      Alert.alert('Success', 'Password reset successfully. Please login with your new password.');
+    } catch (e: any) {
+      setError(e?.detail || 'Password reset failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogin = async () => {
+    const emailError = validateEmail(loginEmail);
+    if (emailError) { setError(emailError); return; }
+    const pwError = validatePassword(loginPassword);
+    if (pwError) { setError(pwError); return; }
     setLoading(true);
     setError('');
     try {
@@ -194,13 +305,27 @@ export default function LoginSignupScreen({ onComplete }: LoginSignupScreenProps
   };
 
   const handleSignup = async () => {
-    if (!firstName.trim() || !signupEmail.trim() || !signupPassword.trim() || !cnic.trim() || !phone.trim()) {
-      setError('Please fill in all required fields.');
-      return;
-    }
+    // Validate all fields in order
+    const checks = [
+      validateRequired(firstName, 'First name'),
+      validateRequired(lastName, 'Last name'),
+      validateEmail(signupEmail),
+      validatePassword(signupPassword),
+      validateCNIC(cnic),
+      validatePhone(phone),
+      validateRequired(address, 'Address'),
+      validateRequired(city, 'City'),
+      validateRequired(country, 'Country'),
+    ];
+    const firstError = checks.find(msg => msg !== '');
+    if (firstError) { setError(firstError); return; }
     setLoading(true);
     setError('');
     try {
+      // Get device location for farmer registration
+      const coords = await getDeviceLocation();
+      gpsCoordsRef.current = coords;
+
       await authService.signup({
         name: firstName.trim(),
         lastname: lastName.trim(),
@@ -211,7 +336,8 @@ export default function LoginSignupScreen({ onComplete }: LoginSignupScreenProps
         Address: address.trim(),
         City: city.trim(),
         country: country.trim(),
-        latitude: '0',
+        latitude: String(coords.latitude),
+        longitude: String(coords.longitude),
       });
       setShowOtp(true);
     } catch (e: any) {
@@ -246,8 +372,8 @@ export default function LoginSignupScreen({ onComplete }: LoginSignupScreenProps
             <Text style={styles.subtitleText}>Please login or sign up to continue.</Text>
           </View>
 
-          {/* Tab Bar — hidden during OTP step */}
-          {!showOtp && (
+          {/* Tab Bar — hidden during OTP or forgot password */}
+          {!showOtp && !forgotStep && (
             <View style={styles.tabContainer}>
               <Pressable style={styles.tabButton} onPress={() => switchTab('login')}>
                 <Text style={[styles.tabText, activeTab === 'login' ? styles.tabTextActive : styles.tabTextInactive]}>
@@ -268,19 +394,23 @@ export default function LoginSignupScreen({ onComplete }: LoginSignupScreenProps
           {showOtp && (
             <OtpStep
               email={signupEmail}
+              gpsCoords={gpsCoordsRef.current}
               onVerified={() => {
                 setShowOtp(false);
-                switchTab('login');
+                onComplete('signup');
               }}
               onBack={() => setShowOtp(false)}
             />
           )}
 
           {/* Login Form */}
-          {!showOtp && activeTab === 'login' && (
+          {!showOtp && !forgotStep && activeTab === 'login' && (
             <View style={styles.formContainer}>
               <FormInput label="Email" placeholder="Enter your email" keyboardType="email-address" value={loginEmail} onChangeText={setLoginEmail} />
               <FormInput label="Password" placeholder="Enter your password" secureTextEntry value={loginPassword} onChangeText={setLoginPassword} />
+              <Pressable onPress={() => { setForgotStep('email'); setError(''); setForgotEmail(loginEmail); }}>
+                <Text style={styles.forgotLink}>Forgot Password?</Text>
+              </Pressable>
               {error ? <Text style={styles.errorText}>{error}</Text> : null}
               <Pressable style={styles.submitButton} onPress={handleLogin} disabled={loading}>
                 {loading ? <ActivityIndicator color={colors.onPrimary} /> : (
@@ -289,6 +419,52 @@ export default function LoginSignupScreen({ onComplete }: LoginSignupScreenProps
                     <Text style={styles.submitButtonArrow}>→</Text>
                   </>
                 )}
+              </Pressable>
+            </View>
+          )}
+
+          {/* Forgot Password — Step 1: Enter Email */}
+          {forgotStep === 'email' && (
+            <View style={styles.formContainer}>
+              <Text style={styles.otpInfo}>
+                Enter your registered email. We'll send a 6-digit OTP to reset your password.
+              </Text>
+              <FormInput label="Email" placeholder="Enter your email" keyboardType="email-address" value={forgotEmail} onChangeText={setForgotEmail} />
+              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+              <Pressable style={styles.submitButton} onPress={handleForgotSendOtp} disabled={loading}>
+                {loading ? <ActivityIndicator color={colors.onPrimary} /> : (
+                  <>
+                    <Text style={styles.submitButtonText}>Send OTP</Text>
+                    <Text style={styles.submitButtonArrow}>→</Text>
+                  </>
+                )}
+              </Pressable>
+              <Pressable style={styles.skipButton} onPress={() => { setForgotStep(null); setError(''); }}>
+                <Text style={styles.skipButtonText}>← Back to Login</Text>
+              </Pressable>
+            </View>
+          )}
+
+          {/* Forgot Password — Step 2: OTP + New Password */}
+          {forgotStep === 'otp' && (
+            <View style={styles.formContainer}>
+              <Text style={styles.otpInfo}>
+                OTP sent to {forgotEmail}. Enter it below and set your new password.
+              </Text>
+              <FormInput label="OTP Code" placeholder="6-digit code" value={resetOtp} onChangeText={setResetOtp} keyboardType="phone-pad" />
+              <FormInput label="New Password" placeholder="Enter new password" secureTextEntry value={newPassword} onChangeText={setNewPassword} />
+              <FormInput label="Confirm Password" placeholder="Confirm new password" secureTextEntry value={confirmPassword} onChangeText={setConfirmPassword} />
+              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+              <Pressable style={styles.submitButton} onPress={handleResetPassword} disabled={loading}>
+                {loading ? <ActivityIndicator color={colors.onPrimary} /> : (
+                  <>
+                    <Text style={styles.submitButtonText}>Reset Password</Text>
+                    <Text style={styles.submitButtonArrow}>→</Text>
+                  </>
+                )}
+              </Pressable>
+              <Pressable style={styles.skipButton} onPress={() => { setForgotStep('email'); setError(''); }}>
+                <Text style={styles.skipButtonText}>← Back</Text>
               </Pressable>
             </View>
           )}
@@ -329,11 +505,6 @@ export default function LoginSignupScreen({ onComplete }: LoginSignupScreenProps
             </View>
           )}
 
-          {!showOtp && (
-            <Pressable style={styles.skipButton} onPress={() => onComplete('skip')}>
-              <Text style={styles.skipButtonText}>Skip for now</Text>
-            </Pressable>
-          )}
         </View>
       </ScrollView>
     </View>
@@ -439,5 +610,10 @@ const styles = StyleSheet.create({
   skipButtonText: {
     fontFamily: 'BeVietnamPro_500Medium', fontSize: 12,
     fontWeight: '500', color: colors.secondary, letterSpacing: 0.12,
+  },
+  forgotLink: {
+    fontFamily: 'BeVietnamPro_500Medium', fontSize: 13,
+    fontWeight: '500', color: colors.primary, textAlign: 'right',
+    marginTop: -4,
   },
 });

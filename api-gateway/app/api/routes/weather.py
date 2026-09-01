@@ -119,6 +119,23 @@ async def proxy_weather_forecast(
 
 
 # =========================================================
+# GET /api/v1/weather/advisory/{farmer_id}  (protected)
+# =========================================================
+
+@router.get("/weather/advisory/{farmer_id}", summary="Get LLM farming advice")
+@limiter.limit(RATE_LIMIT_DEFAULT)
+async def proxy_weather_advisory(
+    request: Request,
+    farmer_id: int,
+    current_user: TokenPayload = Depends(get_current_user),
+):
+    """Proxy to weather-alert-service GET /api/v1/weather/advisory/{farmer_id}"""
+    target = _get_target_url(f"/api/v1/weather/advisory/{farmer_id}")
+    logger.info("proxy_weather_advisory_request", farmer_id=farmer_id)
+    return await _proxy_request(request, target)
+
+
+# =========================================================
 # POST /api/v1/alerts/trigger-check  (protected)
 # =========================================================
 

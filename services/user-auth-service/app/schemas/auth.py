@@ -16,6 +16,7 @@ class SignupRequest(BaseModel):
     City: str
     country: str
     latitude: str
+    longitude: str
     password: str
 
 
