@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { colors } from './src/theme/colors';
+import { tokenStorage } from './src/services/tokenStorage';
 import SplashScreenView from './src/screens/SplashScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import LanguageSelectionScreen from './src/screens/LanguageSelectionScreen';
 import LoginSignupScreen from './src/screens/LoginSignupScreen';
 import HomeDashboard from './src/screens/HomeDashboard';
 import DiseaseScanScreen from './src/screens/DiseaseScanScreen';
+import ScanHistoryScreen from './src/screens/ScanHistoryScreen';
 import WeatherScreen from './src/screens/WeatherScreen';
 import MarketRatesScreen from './src/screens/MarketRatesScreen';
 import HelplineScreen from './src/screens/HelplineScreen';
@@ -19,12 +21,25 @@ SplashScreen.preventAutoHideAsync().catch(() => {
   // On web or if native splash isn't configured, this may fail — safe to ignore
 });
 
-type Screen = 'loading' | 'splash' | 'onboarding' | 'language' | 'login' | 'home' | 'disease' | 'weather' | 'market' | 'helpline' | 'settings';
+type Screen = 'loading' | 'splash' | 'onboarding' | 'language' | 'login' | 'home' | 'disease' | 'history' | 'weather' | 'market' | 'helpline' | 'settings';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('loading');
 
   useEffect(() => {
+    // ─── DEV MODE: Auto-inject test JWT for testing ───
+    // Remove this block when user-auth-service is connected
+    if (__DEV__ && Platform.OS === 'web') {
+      const hasToken = localStorage.getItem('kissan_access_token');
+      if (!hasToken) {
+        // Generate a test token signed with same secret as gateway
+        localStorage.setItem('kissan_access_token', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0LWZhcm1lci0xMjMiLCJlbWFpbCI6ImFobWFkQHRlc3QuY29tIn0.7l0hyVznm9GKjgt-SDmpNZe0dqDOL10z6WOINYm3lpA');
+        localStorage.setItem('kissan_user_email', 'ahmad@test.com');
+        localStorage.setItem('kissan_user_id', 'test-farmer-123');
+        console.log('[DEV] Test JWT token injected into localStorage');
+      }
+    }
+
     // Brief delay to let the app fully mount, then hide native splash
     // and show our JS animated splash
     const timer = setTimeout(async () => {
@@ -57,6 +72,9 @@ export default function App() {
     }
     if (currentScreen === 'disease') {
       return <DiseaseScanScreen onNavigate={(s) => setCurrentScreen(s as Screen)} />;
+    }
+    if (currentScreen === 'history') {
+      return <ScanHistoryScreen onNavigate={(s) => setCurrentScreen(s as Screen)} />;
     }
     if (currentScreen === 'weather') {
       return <WeatherScreen onNavigate={(s) => setCurrentScreen(s as Screen)} />;

@@ -32,7 +32,9 @@
           "backgroundColor": "#4a6b57",
           "resizeMode": "contain"
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-sharing"
     ],
     "extra": {
       "eas": {

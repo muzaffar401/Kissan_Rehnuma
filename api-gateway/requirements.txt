@@ -1,0 +1,26 @@
+# Core
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.34,<1.0
+pydantic>=2.10,<3.0
+pydantic-settings>=2.7,<3.0
+
+# HTTP Client (for proxying)
+httpx>=0.28,<1.0
+
+# Authentication
+python-jose[cryptography]>=3.3.0
+
+# Rate Limiting
+slowapi>=0.1.9
+
+# Circuit Breaker
+pybreaker>=1.4.0
+
+# Logging
+structlog>=24.0,<26.0
+
+# Environment
+python-dotenv>=1.0.1
+
+# CORS
+starlette>=0.38.6
