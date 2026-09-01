@@ -38,4 +38,23 @@ export type {
 
 export { pdfService } from './pdfService';
 
+export { weatherService } from './weatherService';
+export type {
+  CurrentWeatherResponse,
+  ForecastResponse,
+  ForecastEntry,
+  AlertHistoryResponse,
+  AlertHistoryItem,
+  FarmerLocationRequest,
+  FarmerLocationResponse,
+} from './weatherService';
+
+export { marketService } from './marketService';
+export type {
+  RatesResponse,
+  MandiPrice,
+  TrendingResponse,
+  TrendEntry,
+} from './marketService';
+
 export { API_BASE_URL, GATEWAY_HEALTH, ENDPOINTS } from './config';

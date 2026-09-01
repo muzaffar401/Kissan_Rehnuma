@@ -71,17 +71,19 @@ export const ENDPOINTS = {
     health: '/animal/health',
   },
 
-  // Weather endpoints → weather-alert-service
+  // Weather endpoints → weather-alert-service (paths match gateway routes)
   weather: {
-    alerts: '/weather/alerts',
-    forecast: '/weather/forecast',
+    current: (farmerId: number) => `/weather/current/${farmerId}`,
+    forecast: (farmerId: number) => `/weather/forecast/${farmerId}`,
+    location: (farmerId: number) => `/farmers/${farmerId}/location`,
+    alertHistory: (farmerId: number) => `/alerts/history/${farmerId}`,
     health: '/weather/health',
   },
 
   // Market rate endpoints → market-rate-service
   market: {
-    rates: '/market/rates',
-    search: '/market/search',
+    trending: '/market/rates/trending',
+    rates: (crop: string) => `/market/rates/${encodeURIComponent(crop)}`,
     health: '/market/health',
   },
 
