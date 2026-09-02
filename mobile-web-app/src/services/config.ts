@@ -83,6 +83,7 @@ export const ENDPOINTS = {
 
   // Market rate endpoints → market-rate-service
   market: {
+    allRates: '/market/rates',
     trending: '/market/rates/trending',
     rates: (crop: string) => `/market/rates/${encodeURIComponent(crop)}`,
     health: '/market/health',

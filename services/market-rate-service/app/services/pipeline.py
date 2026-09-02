@@ -11,13 +11,14 @@ from app.repositories.crop_repo import CropRepository
 from app.repositories.mandi_repo import MandiRepository
 from app.repositories.price_repo import PriceRepository
 from app.services import ingestion
-from app.services.sources import amis, manual, zarai_mandi
+from app.services.sources import amis, irfarm, manual, zarai_mandi
 from app.services.sources.base import RawPrice
 
 logger = logging.getLogger("market_rate.pipeline")
 
 SOURCES: List[tuple] = [
     ("amis", amis.fetch_from_amis),
+    ("irfarm", irfarm.fetch_from_irfarm),
     ("zarai_mandi", zarai_mandi.fetch_from_zarai_mandi),
     ("manual", manual.fetch_manual_entry),
 ]
@@ -32,7 +33,10 @@ def store_records(db: Session, records: List[ingestion.StandardPrice]) -> int:
         mandi = mandi_repo.get_or_create(rec.mandi_name, rec.city)
         crop = crop_repo.get_or_create(rec.crop_name)
         price_repo.create(
-            mandi.id, crop.id, rec.price_per_kg, rec.recorded_date, rec.source
+            mandi.id, crop.id, rec.price_per_kg, rec.recorded_date, rec.source,
+            min_price=rec.min_price_per_kg,
+            max_price=rec.max_price_per_kg,
+            fqp_price=rec.fqp_price_per_kg,
         )
         stored += 1
     return stored

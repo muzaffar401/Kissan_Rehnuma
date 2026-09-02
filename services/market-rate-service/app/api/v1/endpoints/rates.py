@@ -1,13 +1,14 @@
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.models.mandi import Mandi
 from app.repositories.price_repo import PriceRepository
 from app.schemas.rates import (
-    MandiPrice, RatesResponse, TrendEntry, TrendingResponse
+    AllRatesResponse, CropPrice, MandiPrice, RatesResponse,
+    TrendEntry, TrendingResponse,
 )
 from app.services import cache, ingestion
 
@@ -17,6 +18,50 @@ router = APIRouter()
 def _resolve_crop(crop: str) -> str:
     """Accept raw variants ("gandum") and standardize ("Wheat")."""
     return ingestion.standardize_crop(crop) or crop.strip().title()
+
+
+@router.get("/rates", response_model=AllRatesResponse)
+def get_all_rates(
+    q: str = Query(None, description="Search by crop name"),
+    db: Session = Depends(get_db),
+):
+    """All latest mandi rates, optionally filtered by crop name."""
+    key = f"all_rates:{q or 'all'}"
+    cached = cache.cache_get(key)
+    if cached is not None:
+        return cached
+
+    repo = PriceRepository(db)
+    rows = repo.all_latest(limit=500)
+
+    # Optional search filter
+    if q:
+        q_lower = q.strip().lower()
+        rows = [r for r in rows if q_lower in r["crop_name"].lower()]
+
+    crops = [
+        CropPrice(
+            crop_name=r["crop_name"],
+            mandi_name=r["mandi_name"],
+            city=r["city"],
+            price=r["price"],
+            min_price=r["min_price"],
+            max_price=r["max_price"],
+            fqp_price=r["fqp_price"],
+            recorded_date=r["recorded_date"],
+            source=r["source"],
+        )
+        for r in rows
+    ]
+
+    recorded = rows[0]["recorded_date"] if rows else None
+    response = AllRatesResponse(
+        recorded_date=recorded,
+        total=len(crops),
+        crops=crops,
+    ).model_dump(mode="json")
+    cache.cache_set(key, response)
+    return response
 
 
 @router.get("/rates/trending", response_model=TrendingResponse)
@@ -97,6 +142,9 @@ def get_rates(crop: str, db: Session = Depends(get_db)):
             mandi=mandis[row.mandi_id].name,
             city=mandis[row.mandi_id].city,
             price_per_kg=float(row.price),
+            min_price_per_kg=float(row.min_price) if row.min_price else None,
+            max_price_per_kg=float(row.max_price) if row.max_price else None,
+            fqp_price_per_kg=float(row.fqp_price) if row.fqp_price else None,
             recorded_date=row.recorded_date,
             source=row.source,
         )

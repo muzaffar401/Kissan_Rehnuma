@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Image,
   Platform,
   Pressable,
@@ -23,24 +24,12 @@ import {
   BeVietnamPro_600SemiBold,
 } from '@expo-google-fonts/be-vietnam-pro';
 import { colors } from '../theme/colors';
+import { marketService, type CropPrice } from '../services/marketService';
 
 type BottomTab = 'home' | 'disease' | 'weather' | 'market' | 'helpline';
-type TrendDirection = 'up' | 'down' | 'flat';
 
 interface MarketRatesScreenProps {
   onNavigate?: (screen: string) => void;
-}
-
-interface RateCard {
-  id: string;
-  name: string;
-  mandi: string;
-  icon: string;
-  price: string;
-  unit: string;
-  trend: TrendDirection;
-  trendValue: string;
-  category: string;
 }
 
 const bottomTabs: { key: BottomTab; icon: string; label: string }[] = [
@@ -52,65 +41,60 @@ const bottomTabs: { key: BottomTab; icon: string; label: string }[] = [
 ];
 
 const filterChips = [
-  'All Categories',
+  'All',
   'Grains',
   'Vegetables',
   'Fruits',
-  'Fertilizers',
 ];
 
-const rateCards: RateCard[] = [
-  {
-    id: '1',
-    name: 'Wheat',
-    mandi: 'Lahore Mandi',
-    icon: 'barley',
-    price: '3,200',
-    unit: 'Price per 40kg',
-    trend: 'up',
-    trendValue: '+50',
-    category: 'Grains',
-  },
-  {
-    id: '2',
-    name: 'Rice (Basmati)',
-    mandi: 'Multan Mandi',
-    icon: 'noodles',
-    price: '8,500',
-    unit: 'Price per 40kg',
-    trend: 'down',
-    trendValue: '-120',
-    category: 'Grains',
-  },
-  {
-    id: '3',
-    name: 'Tomato',
-    mandi: 'Faisalabad Mandi',
-    icon: 'food-apple',
-    price: '600',
-    unit: 'Price per 5kg',
-    trend: 'up',
-    trendValue: '+15',
-    category: 'Vegetables',
-  },
-  {
-    id: '4',
-    name: 'Sugarcane',
-    mandi: 'Sargodha Mandi',
-    icon: 'grass',
-    price: '400',
-    unit: 'Price per 40kg',
-    trend: 'flat',
-    trendValue: '0',
-    category: 'Grains',
-  },
-];
+// Categorize crop by name for filter chips
+function categorize(name: string): string {
+  const n = name.toLowerCase();
+  const fruits = ['apple', 'banana', 'guava', 'orange', 'kinnow', 'mango', 'melon', 'watermelon', 'lychee', 'strawberry', 'dates', 'lemon', 'peach', 'plum', 'pear', 'musambi', 'grapefruit', 'grapes', 'apricot', 'pomegranate', 'sweet musk', 'jujube', 'coconut', 'papaya', 'loquat', 'persimmon', 'jaman', 'feutral'];
+  const grains = ['wheat', 'rice', 'maize', 'millet', 'sorghum', 'barley', 'sugar', 'jaggery', 'sugarcane', 'cotton', 'gram', 'moong', 'mash', 'masoor', 'rapeseed', 'canola', 'sunflower', 'sesame', 'mustard seed', 'groundnut', 'red chilli', 'banola', 'fodder', 'straw'];
+  if (fruits.some(f => n.includes(f))) return 'Fruits';
+  if (grains.some(g => n.includes(g))) return 'Grains';
+  return 'Vegetables';
+}
+
+// Map crop name to MaterialCommunityIcons icon
+function cropIcon(name: string): string {
+  const n = name.toLowerCase();
+  if (n.includes('wheat') || n.includes('maize') || n.includes('rice') || n.includes('barley') || n.includes('millet') || n.includes('sorghum')) return 'grain';
+  if (n.includes('tomato')) return 'food-apple';
+  if (n.includes('onion')) return 'food-apple';
+  if (n.includes('potato')) return 'food';
+  if (n.includes('apple')) return 'food-apple';
+  if (n.includes('banana')) return 'food';
+  if (n.includes('mango')) return 'fruit-cherries';
+  if (n.includes('grape')) return 'fruit-grapes';
+  if (n.includes('sugar')) return 'cube-outline';
+  if (n.includes('cotton')) return 'weather-snowy';
+  if (n.includes('chilli')) return 'food-apple';
+  if (n.includes('garlic') || n.includes('ginger')) return 'food';
+  if (n.includes('lemon')) return 'food-apple';
+  if (n.includes('melon') || n.includes('watermelon')) return 'food';
+  if (n.includes('peach') || n.includes('pear')) return 'food-apple';
+  if (n.includes('date')) return 'food';
+  if (n.includes('gram') || n.includes('moong') || n.includes('mash') || n.includes('masoor')) return 'grain';
+  return 'food-apple';
+}
+
+function formatPrice(price: number | null): string {
+  if (price === null || price === undefined) return '—';
+  if (price < 1) return price.toFixed(2);
+  return price.toFixed(0);
+}
 
 export default function MarketRatesScreen({ onNavigate }: MarketRatesScreenProps) {
   const { width } = useWindowDimensions();
   const [bottomActive, setBottomActive] = useState<BottomTab>('market');
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeChip, setActiveChip] = useState('All Categories');
+  const [activeChip, setActiveChip] = useState('All');
+  const [crops, setCrops] = useState<CropPrice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [recordedDate, setRecordedDate] = useState<string | null>(null);
   const [fontsLoaded] = useFonts({
     PlusJakartaSans_600SemiBold,
     PlusJakartaSans_700Bold,
@@ -121,30 +105,55 @@ export default function MarketRatesScreen({ onNavigate }: MarketRatesScreenProps
 
   const isWide = width > 600;
   const contentMaxWidth = isWide ? 672 : width;
-
-  // Responsive card width for 1 or 2 columns
   const cardGap = 12;
-  const numColumns = isWide ? 2 : 1;
   const cardWidth = isWide
     ? (contentMaxWidth - 40 - cardGap) / 2
     : contentMaxWidth - 40;
 
+  // Fetch rates from API
+  useEffect(() => {
+    let cancelled = false;
+    const fetchRates = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await marketService.getAllRates();
+        if (!cancelled) {
+          setCrops(data.crops);
+          setRecordedDate(data.recorded_date);
+        }
+      } catch (err: unknown) {
+        if (!cancelled) {
+          const msg = err && typeof err === 'object' && 'detail' in err
+            ? (err as { detail: string }).detail
+            : 'Failed to load market rates';
+          setError(msg);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    fetchRates();
+    return () => { cancelled = true; };
+  }, []);
+
   // Filter cards based on search + chip
-  const filteredCards = useMemo(() => {
-    let cards = rateCards;
-    if (activeChip !== 'All Categories') {
-      cards = cards.filter((c) => c.category === activeChip);
+  const filteredCrops = useMemo(() => {
+    let items = crops;
+    if (activeChip !== 'All') {
+      items = items.filter((c) => categorize(c.crop_name) === activeChip);
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      cards = cards.filter(
+      items = items.filter(
         (c) =>
-          c.name.toLowerCase().includes(q) ||
-          c.mandi.toLowerCase().includes(q)
+          c.crop_name.toLowerCase().includes(q) ||
+          c.mandi_name.toLowerCase().includes(q) ||
+          c.city.toLowerCase().includes(q)
       );
     }
-    return cards;
-  }, [searchQuery, activeChip]);
+    return items;
+  }, [crops, searchQuery, activeChip]);
 
   if (!fontsLoaded) {
     return <View style={styles.container} />;
@@ -188,10 +197,17 @@ export default function MarketRatesScreen({ onNavigate }: MarketRatesScreenProps
             style={styles.headerImage}
             resizeMode="cover"
           />
-          {/* Gradient overlay */}
           <View style={styles.headerGradient} />
           <Text style={styles.headerTitle}>Market Rates</Text>
         </View>
+
+        {/* Date badge */}
+        {recordedDate && (
+          <View style={styles.dateBadge}>
+            <MaterialCommunityIcons name="calendar-today" size={14} color={colors.onSurfaceVariant} />
+            <Text style={styles.dateText}>Rates as of {recordedDate}</Text>
+          </View>
+        )}
 
         {/* Search Bar */}
         <View style={styles.searchContainer}>
@@ -236,100 +252,102 @@ export default function MarketRatesScreen({ onNavigate }: MarketRatesScreenProps
           })}
         </ScrollView>
 
+        {/* Loading State */}
+        {loading && (
+          <View style={styles.centerState}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.centerText}>Loading mandi rates...</Text>
+          </View>
+        )}
+
+        {/* Error State */}
+        {error && !loading && (
+          <View style={styles.centerState}>
+            <MaterialCommunityIcons name="alert-circle" size={48} color={colors.error} />
+            <Text style={styles.centerText}>{error}</Text>
+            <Pressable style={styles.retryBtn} onPress={() => {}}>
+              <Text style={styles.retryText}>Retry</Text>
+            </Pressable>
+          </View>
+        )}
+
         {/* Rate Cards Grid */}
-        <View style={styles.cardsGrid}>
-          {filteredCards.map((card) => (
-            <Pressable
-              key={card.id}
-              style={[styles.rateCard, { width: cardWidth }]}
-            >
-              {/* Top section */}
-              <View style={styles.cardTop}>
-                <View style={styles.cardLeft}>
-                  <View style={styles.cardIconCircle}>
-                    <MaterialCommunityIcons
-                      name={card.icon as any}
-                      size={24}
-                      color={colors.onSecondaryContainer}
-                    />
-                  </View>
-                  <View style={styles.cardInfo}>
-                    <Text style={styles.cardName}>{card.name}</Text>
-                    <View style={styles.cardMandiRow}>
-                      <MaterialCommunityIcons
-                        name="map-marker"
-                        size={14}
-                        color={colors.onSurfaceVariant}
-                      />
-                      <Text style={styles.cardMandi}>{card.mandi}</Text>
+        {!loading && !error && (
+          <>
+            <Text style={styles.resultsCount}>
+              {filteredCrops.length} items{activeChip !== 'All' ? ` in ${activeChip}` : ''}
+            </Text>
+            <View style={styles.cardsGrid}>
+              {filteredCrops.map((item) => (
+                <View
+                  key={`${item.crop_name}-${item.mandi_name}`}
+                  style={[styles.rateCard, { width: cardWidth }]}
+                >
+                  {/* Top section */}
+                  <View style={styles.cardTop}>
+                    <View style={styles.cardLeft}>
+                      <View style={styles.cardIconCircle}>
+                        <MaterialCommunityIcons
+                          name={cropIcon(item.crop_name) as any}
+                          size={24}
+                          color={colors.onSecondaryContainer}
+                        />
+                      </View>
+                      <View style={styles.cardInfo}>
+                        <Text style={styles.cardName} numberOfLines={1}>{item.crop_name}</Text>
+                        <View style={styles.cardMandiRow}>
+                          <MaterialCommunityIcons
+                            name="map-marker"
+                            size={14}
+                            color={colors.onSurfaceVariant}
+                          />
+                          <Text style={styles.cardMandi}>{item.mandi_name}</Text>
+                        </View>
+                      </View>
+                    </View>
+                    {/* Category badge */}
+                    <View style={[
+                      styles.categoryBadge,
+                      categorize(item.crop_name) === 'Grains' && styles.catGrains,
+                      categorize(item.crop_name) === 'Vegetables' && styles.catVegetables,
+                      categorize(item.crop_name) === 'Fruits' && styles.catFruits,
+                    ]}>
+                      <Text style={styles.categoryText}>
+                        {categorize(item.crop_name)}
+                      </Text>
                     </View>
                   </View>
-                </View>
-                {/* Trend badge */}
-                <View
-                  style={[
-                    styles.trendBadge,
-                    card.trend === 'up' && styles.trendUp,
-                    card.trend === 'down' && styles.trendDown,
-                    card.trend === 'flat' && styles.trendFlat,
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    name={
-                      card.trend === 'up'
-                        ? 'arrow-up'
-                        : card.trend === 'down'
-                        ? 'arrow-down'
-                        : 'minus'
-                    }
-                    size={14}
-                    color={
-                      card.trend === 'up'
-                        ? colors.primary
-                        : card.trend === 'down'
-                        ? colors.error
-                        : colors.outline
-                    }
-                  />
-                  <Text
-                    style={[
-                      styles.trendText,
-                      card.trend === 'up' && styles.trendTextUp,
-                      card.trend === 'down' && styles.trendTextDown,
-                      card.trend === 'flat' && styles.trendTextFlat,
-                    ]}
-                  >
-                    {card.trendValue}
-                  </Text>
-                </View>
-              </View>
 
-              {/* Divider + Price */}
-              <View style={styles.cardBottom}>
-                <Text style={styles.cardUnit}>{card.unit}</Text>
-                <Text
-                  style={[
-                    styles.cardPrice,
-                    card.trend === 'flat' && styles.cardPriceFlat,
-                  ]}
-                >
-                  {card.price} PKR
-                </Text>
-              </View>
-            </Pressable>
-          ))}
-        </View>
+                  {/* Divider + Price */}
+                  <View style={styles.cardBottom}>
+                    <View>
+                      <Text style={styles.cardUnit}>FQP Price/kg</Text>
+                      {item.min_price !== null && item.max_price !== null && (
+                        <Text style={styles.cardRange}>
+                          Min: {formatPrice(item.min_price)} — Max: {formatPrice(item.max_price)}
+                        </Text>
+                      )}
+                    </View>
+                    <Text style={styles.cardPrice}>
+                      {formatPrice(item.fqp_price)} <Text style={styles.cardCurrency}>PKR</Text>
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
 
-        {/* Empty state */}
-        {filteredCards.length === 0 && (
-          <View style={styles.emptyState}>
-            <MaterialCommunityIcons
-              name="magnify-close"
-              size={48}
-              color={colors.outline}
-            />
-            <Text style={styles.emptyText}>No results found</Text>
-          </View>
+            {/* Empty state */}
+            {filteredCrops.length === 0 && (
+              <View style={styles.emptyState}>
+                <MaterialCommunityIcons
+                  name="magnify-close"
+                  size={48}
+                  color={colors.outline}
+                />
+                <Text style={styles.emptyText}>No results found</Text>
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
 
@@ -375,309 +393,168 @@ export default function MarketRatesScreen({ onNavigate }: MarketRatesScreenProps
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.surface,
-  },
-  // ─── Top App Bar ───
+  container: { flex: 1, backgroundColor: colors.surface },
   appBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    height: 56,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.surfaceContainer,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, height: 56, backgroundColor: colors.surface,
+    borderBottomWidth: 1, borderBottomColor: colors.surfaceContainer,
   },
-  appBarBtn: {
-    width: 48,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 24,
-  },
+  appBarBtn: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 24 },
   appBarTitle: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.primary,
-    flex: 1,
-    textAlign: 'center',
+    fontFamily: 'PlusJakartaSans_700Bold', fontSize: 20, fontWeight: '700',
+    color: colors.primary, flex: 1, textAlign: 'center',
   },
-  // ─── Scroll Content ───
-  scrollView: {
-    flex: 1,
-  },
+  scrollView: { flex: 1 },
   scrollContent: {
-    paddingTop: 12,
-    paddingBottom: 40,
-    paddingHorizontal: 20,
-    gap: 16,
-    alignSelf: 'center' as const,
-    width: '100%',
+    paddingTop: 12, paddingBottom: 40, paddingHorizontal: 20,
+    gap: 16, alignSelf: 'center' as const, width: '100%',
   },
-  // ─── Header Image ───
   headerContainer: {
-    height: 192,
-    borderRadius: 12,
-    overflow: 'hidden',
+    height: 192, borderRadius: 12, overflow: 'hidden',
     backgroundColor: colors.surfaceContainerLow,
-    shadowColor: '#4A453C',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-    elevation: 4,
+    shadowColor: '#4A453C', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08, shadowRadius: 24, elevation: 4,
   },
-  headerImage: {
-    width: '100%',
-    height: '100%',
-  },
+  headerImage: { width: '100%', height: '100%' },
   headerGradient: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(234, 225, 213, 0.35)',
   },
   headerTitle: {
-    position: 'absolute',
-    bottom: 12,
-    left: 16,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 26,
-    fontWeight: '700',
-    color: colors.primary,
+    position: 'absolute', bottom: 12, left: 16,
+    fontFamily: 'PlusJakartaSans_700Bold', fontSize: 26, fontWeight: '700', color: colors.primary,
   },
-  // ─── Search Bar ───
+  dateBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: colors.surfaceContainer, paddingHorizontal: 12,
+    paddingVertical: 6, borderRadius: 8, alignSelf: 'flex-start',
+  },
+  dateText: {
+    fontFamily: 'BeVietnamPro_400Regular', fontSize: 13,
+    fontWeight: '400', color: colors.onSurfaceVariant,
+  },
   searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceContainer,
-    borderRadius: 9999,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-    height: 56,
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: colors.surfaceContainer, borderRadius: 9999,
+    borderWidth: 1, borderColor: colors.outlineVariant, height: 56,
     paddingHorizontal: 16,
-    shadowColor: '#4A453C',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowColor: '#4A453C', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 3, elevation: 2,
   },
-  searchIcon: {
-    marginRight: 8,
-  },
+  searchIcon: { marginRight: 8 },
   searchInput: {
-    flex: 1,
-    fontFamily: 'BeVietnamPro_400Regular',
-    fontSize: 16,
-    fontWeight: '400',
-    color: colors.onSurface,
-    height: '100%',
-    paddingVertical: 0,
+    flex: 1, fontFamily: 'BeVietnamPro_400Regular', fontSize: 16,
+    fontWeight: '400', color: colors.onSurface, height: '100%', paddingVertical: 0,
   },
-  // ─── Filter Chips ───
-  chipsScroll: {
-    gap: 8,
-    paddingVertical: 4,
-  },
+  chipsScroll: { gap: 8, paddingVertical: 4 },
   chip: {
-    paddingHorizontal: 24,
-    height: 40,
-    borderRadius: 9999,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: 24, height: 40, borderRadius: 9999,
+    borderWidth: 1, borderColor: colors.outlineVariant,
+    backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center',
   },
-  chipActive: {
-    backgroundColor: colors.primaryContainer,
-    borderColor: colors.primary,
-  },
+  chipActive: { backgroundColor: colors.primaryContainer, borderColor: colors.primary },
   chipText: {
-    fontFamily: 'BeVietnamPro_600SemiBold',
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.onSurfaceVariant,
-    letterSpacing: 0.14,
+    fontFamily: 'BeVietnamPro_600SemiBold', fontSize: 14, fontWeight: '600',
+    color: colors.onSurfaceVariant, letterSpacing: 0.14,
   },
-  chipTextActive: {
-    color: colors.onPrimaryContainer,
+  chipTextActive: { color: colors.onPrimaryContainer },
+  resultsCount: {
+    fontFamily: 'BeVietnamPro_500Medium', fontSize: 14,
+    fontWeight: '500', color: colors.onSurfaceVariant,
   },
-  // ─── Rate Cards Grid ───
-  cardsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
+  cardsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   rateCard: {
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.surfaceVariant,
-    shadowColor: '#4A453C',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    backgroundColor: colors.surfaceContainerLowest, borderRadius: 12, padding: 16,
+    borderWidth: 1, borderColor: colors.surfaceVariant,
+    shadowColor: '#4A453C', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
     justifyContent: 'space-between',
   },
-  cardTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  cardLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
+  cardLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   cardIconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 48, height: 48, borderRadius: 24,
     backgroundColor: colors.secondaryContainer,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  cardInfo: {
-    flex: 1,
-    gap: 2,
-  },
+  cardInfo: { flex: 1, gap: 2 },
   cardName: {
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.onSurface,
+    fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 18,
+    fontWeight: '600', color: colors.onSurface,
   },
-  cardMandiRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
+  cardMandiRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   cardMandi: {
-    fontFamily: 'BeVietnamPro_400Regular',
-    fontSize: 14,
-    fontWeight: '400',
-    color: colors.onSurfaceVariant,
+    fontFamily: 'BeVietnamPro_400Regular', fontSize: 14,
+    fontWeight: '400', color: colors.onSurfaceVariant,
   },
-  // ─── Trend Badge ───
-  trendBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  trendUp: {
-    backgroundColor: 'rgba(74, 107, 87, 0.12)',
-  },
-  trendDown: {
-    backgroundColor: 'rgba(186, 26, 26, 0.1)',
-  },
-  trendFlat: {
+  categoryBadge: {
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6,
     backgroundColor: colors.surfaceVariant,
   },
-  trendText: {
-    fontFamily: 'BeVietnamPro_600SemiBold',
-    fontSize: 14,
-    fontWeight: '600',
-    letterSpacing: 0.14,
+  catGrains: { backgroundColor: 'rgba(139, 117, 51, 0.12)' },
+  catVegetables: { backgroundColor: 'rgba(74, 107, 87, 0.12)' },
+  catFruits: { backgroundColor: 'rgba(186, 100, 26, 0.12)' },
+  categoryText: {
+    fontFamily: 'BeVietnamPro_500Medium', fontSize: 11,
+    fontWeight: '500', color: colors.onSurfaceVariant,
   },
-  trendTextUp: {
-    color: colors.primary,
-  },
-  trendTextDown: {
-    color: colors.error,
-  },
-  trendTextFlat: {
-    color: colors.outline,
-  },
-  // ─── Card Bottom (Price) ───
   cardBottom: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    borderTopWidth: 1,
-    borderTopColor: colors.surfaceVariant,
-    paddingTop: 16,
-    marginTop: 4,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end',
+    borderTopWidth: 1, borderTopColor: colors.surfaceVariant, paddingTop: 16, marginTop: 4,
   },
   cardUnit: {
-    fontFamily: 'BeVietnamPro_500Medium',
-    fontSize: 12,
-    fontWeight: '500',
-    color: colors.onSurfaceVariant,
+    fontFamily: 'BeVietnamPro_500Medium', fontSize: 12,
+    fontWeight: '500', color: colors.onSurfaceVariant,
+  },
+  cardRange: {
+    fontFamily: 'BeVietnamPro_400Regular', fontSize: 11,
+    fontWeight: '400', color: colors.outline, marginTop: 2,
   },
   cardPrice: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 24,
-    fontWeight: '700',
-    color: colors.primary,
+    fontFamily: 'PlusJakartaSans_700Bold', fontSize: 24,
+    fontWeight: '700', color: colors.primary,
   },
-  cardPriceFlat: {
-    color: colors.onSurface,
+  cardCurrency: {
+    fontFamily: 'BeVietnamPro_500Medium', fontSize: 14,
+    fontWeight: '500',
   },
-  // ─── Empty State ───
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 48,
-    gap: 12,
+  centerState: {
+    alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 12,
   },
+  centerText: {
+    fontFamily: 'BeVietnamPro_400Regular', fontSize: 16,
+    fontWeight: '400', color: colors.onSurfaceVariant, textAlign: 'center',
+  },
+  retryBtn: {
+    paddingHorizontal: 24, paddingVertical: 10, borderRadius: 8,
+    backgroundColor: colors.primaryContainer, marginTop: 4,
+  },
+  retryText: {
+    fontFamily: 'BeVietnamPro_600SemiBold', fontSize: 14,
+    fontWeight: '600', color: colors.onPrimaryContainer,
+  },
+  emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 12 },
   emptyText: {
-    fontFamily: 'BeVietnamPro_400Regular',
-    fontSize: 16,
-    fontWeight: '400',
-    color: colors.onSurfaceVariant,
+    fontFamily: 'BeVietnamPro_400Regular', fontSize: 16,
+    fontWeight: '400', color: colors.onSurfaceVariant,
   },
-  // ─── Bottom Navigation ───
   bottomNav: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    backgroundColor: colors.surfaceContainer,
-    height: 80,
-    paddingHorizontal: 8,
-    paddingBottom: Platform.OS === 'ios' ? 20 : 8,
-    borderTopWidth: 1,
-    borderTopColor: colors.surfaceDim,
-    shadowColor: '#4A453C',
-    shadowOffset: { width: 0, height: -1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 8,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around',
+    backgroundColor: colors.surfaceContainer, height: 80,
+    paddingHorizontal: 8, paddingBottom: Platform.OS === 'ios' ? 20 : 8,
+    borderTopWidth: 1, borderTopColor: colors.surfaceDim,
+    shadowColor: '#4A453C', shadowOffset: { width: 0, height: -1 },
+    shadowOpacity: 0.08, shadowRadius: 3, elevation: 8,
   },
   navItem: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 56,
-    paddingVertical: 4,
-    paddingHorizontal: 16,
-    borderRadius: 16,
+    alignItems: 'center', justifyContent: 'center',
+    minWidth: 56, paddingVertical: 4, paddingHorizontal: 16, borderRadius: 16,
   },
-  navItemActive: {
-    backgroundColor: colors.primaryContainer,
-    borderRadius: 28,
-  },
+  navItemActive: { backgroundColor: colors.primaryContainer, borderRadius: 28 },
   navLabel: {
-    fontFamily: 'BeVietnamPro_500Medium',
-    fontSize: 12,
-    fontWeight: '500',
-    marginTop: 4,
+    fontFamily: 'BeVietnamPro_500Medium', fontSize: 12,
+    fontWeight: '500', marginTop: 4,
   },
-  navLabelActive: {
-    color: colors.onPrimaryContainer,
-  },
-  navLabelInactive: {
-    color: colors.onSurfaceVariant,
-  },
+  navLabelActive: { color: colors.onPrimaryContainer },
+  navLabelInactive: { color: colors.onSurfaceVariant },
 });

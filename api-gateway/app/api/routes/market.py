@@ -69,6 +69,22 @@ async def _proxy_request(request: Request, target_url: str) -> Response:
 
 
 # =========================================================
+# GET /api/v1/market/rates  (protected) — all latest rates
+# =========================================================
+
+@router.get("/rates", summary="Get all latest mandi rates")
+@limiter.limit(RATE_LIMIT_HISTORY)
+async def proxy_all_rates(
+    request: Request,
+    current_user: TokenPayload = Depends(get_current_user),
+):
+    """Proxy to market-rate-service GET /api/v1/rates"""
+    target = _get_target_url("/api/v1/market/rates")
+    logger.info("proxy_market_all_rates_request")
+    return await _proxy_request(request, target)
+
+
+# =========================================================
 # GET /api/v1/market/rates/trending  (protected)
 # =========================================================
 

@@ -31,6 +31,7 @@
 - [Dataset Strategy](#dataset-strategy)
 - [Getting Started (Local Development)](#getting-started-local-development)
 - [Project Status](#project-status)
+- [Pending Work & Roadmap](#pending-work--roadmap)
 
 ---
 
@@ -614,13 +615,14 @@ cd Kissan_Rehnuma
 docker-compose up -d
 
 # 3. Access services
-# API Gateway:     http://localhost:8000
+# API Gateway:     http://localhost:3000
+# Auth Service:    http://localhost:8002
 # Crop Service:    http://localhost:8001
-# Animal Service:  http://localhost:8002
-# Weather Service: http://localhost:8003
-# Market Service:  http://localhost:8004
-# Voice Service:   http://localhost:8005
-# Auth Service:    http://localhost:8006
+# Animal Service:  http://localhost:8003
+# Weather Service: http://localhost:8004
+# Market Service:  http://localhost:8005
+# Voice Service:   http://localhost:8006
+# Frontend (Web):  http://localhost:8081
 ```
 
 ### Environment Variables
@@ -651,17 +653,84 @@ VOICE_SERVICE_URL=http://localhost:8005
 | Component | Status | Notes |
 |-----------|--------|-------|
 | Folder Structure | ✅ Complete | Enterprise-level microservices layout |
-| API Gateway | 🔲 Planned | Routing, auth, circuit breaker |
-| Crop Disease Service | 🔲 Planned | LangGraph + CV detector + RAG |
-| Animal Disease Service | 🔲 Planned | Similar to crop, with vet matching |
-| Weather Alert Service | 🔲 Planned | Weather API + LLM advisory |
-| Market Rate Service | 🔲 Planned | Price sync + trend analysis |
-| Voice Helpline | 🔲 Planned | Twilio + LangGraph voice agent |
-| Auth Service | 🔲 Planned | JWT, farmer registration |
-| Shared Library | 🔲 Planned | Logging, exceptions, auth helpers |
-| Mobile/Web App | 🔲 Planned | React Native (Expo) |
-| Docker Compose | 🔲 Planned | Local dev environment |
-| CI/CD Pipeline | 🔲 Planned | GitHub Actions |
+| API Gateway | ✅ Working | Routing, JWT auth, circuit breaker, rate limiting, CORS |
+| User Auth Service | ✅ Working | JWT signup/login, OTP verification, farmer registration |
+| Crop Disease Service | ✅ Working | LangGraph agent, CV detector, pgvector RAG, treatment plans |
+| Animal Disease Service | ✅ Working | LangGraph agent, CV detector, pgvector RAG, vet matching |
+| Weather Alert Service | ✅ Working | OpenWeatherMap integration, LLM advisory, multi-layer caching (15/30/60min TTL) |
+| Market Rate Service | ✅ Working | AMIS Punjab scraper, 47 commodities, min/max/FQP prices, 36 Punjab mandis seeded |
+| Voice Helpline Service | 🔲 In Progress | Service structure created, core logic pending |
+| Shared Library | ✅ Working | Logging, exceptions, JWT helpers, observability |
+| Mobile/Web App (Frontend) | ✅ Working | All screens: Splash, Onboarding, Login, Home, Disease, Weather, Market, Helpline, Settings |
+| Session Persistence | ✅ Working | JWT restore on refresh, onboarding tracking, logout flow |
+| Docker Compose | 🔲 Pending | Not yet created |
+| CI/CD Pipeline | 🔲 Pending | Not yet created |
+| Tests | 🔲 Pending | Unit/integration test stubs exist, no coverage yet |
+
+---
+
+## Pending Work (Roadmap)
+
+### 🔴 Critical — Must Complete
+
+- [ ] **Market: Multi-city AMIS scraping** — Currently only Lahore mandi. Need Multan, Faisalabad, Rawalpindi, etc. (36 mandis seeded, scraper needs city iteration)
+- [ ] **Market: Frontend ↔ Gateway connection verified** — Frontend calls `/market/rates` via gateway, needs JWT auth flow tested end-to-end
+- [ ] **Voice Helpline Service** — Core voice agent logic, STT/TTS integration, LangGraph conversation flow
+- [ ] **Docker Compose** — Single `docker-compose up` to start all services + PostgreSQL + Redis
+- [ ] **Git push fix** — Repository URL needs correction (`muzaffar401/Kissan_Rehnuma` returns 404)
+
+### 🟡 Medium — Enterprise Features
+
+- [ ] **Market: Unique constraint on (mandi_id, crop_id, recorded_date)** — Prevent duplicate price entries on re-runs
+- [ ] **Market: Data validation** — Reject prices outside reasonable range (e.g., Wheat can't be 0 or 1,000,000)
+- [ ] **Market: Expand crop coverage** — AMIS has 136 commodities, scraper gets 47 with prices. Remaining 89 have no data today but should be captured when available
+- [ ] **Market: Historical price chart** — Frontend shows price over time (line chart per crop)
+- [ ] **Market: Per-mandi price comparison** — Show same crop's price across different mandis side-by-side
+- [ ] **Weather: Multi-language advisory** — Urdu, Punjabi support beyond English
+- [ ] **Auth: Password reset flow** — forgot-password endpoint exists, full flow not tested
+- [ ] **API Gateway: Health dashboard** — Aggregated health of all downstream services
+
+### 🟢 Low — Scale & Polish
+
+- [ ] **Market: Multiple data sources** — Zarai Mandi, manual entry, Pakistan Agricultural Research Council
+- [ ] **Market: Price alerts** — Farmer sets target price, notification when reached
+- [ ] **Market: Price forecasting** — ARIMA/Prophet for next 7/30 day prediction
+- [ ] **Market: "Best time to sell" advisory** — Based on trend, tell farmer when to sell
+- [ ] **Market: Arrival quantity tracking** — AMIS provides arrival data, show supply levels
+- [ ] **Market: International price comparison** — Global commodity prices for context
+- [ ] **Frontend: Push notifications** — Weather alerts, price alerts
+- [ ] **Frontend: Offline mode** — Cache last-known data for areas with poor connectivity
+- [ ] **CI/CD: GitHub Actions** — Auto-test on PR, auto-deploy on merge
+- [ ] **Testing: Unit tests** — All services need proper test coverage
+- [ ] **Testing: Integration tests** — End-to-end API tests through gateway
+- [ ] **Kubernetes manifests** — Production deployment configuration
+- [ ] **Monitoring: Prometheus + Grafana** — Service metrics, alerting
+- [ ] **Rate limiting: Per-farmer limits** — Currently IP-based, need user-based
+
+### ✅ Completed
+
+- [x] AMIS Punjab scraper rewritten — scrapes `ViewPrices.aspx` for all commodities with Min/Max/FQP
+- [x] Crop synonyms expanded — 7 → 150+ mappings (Punjabi/Urdu/English → standard names)
+- [x] DB migration — `min_price`, `max_price`, `fqp_price` columns added to prices table
+- [x] 36 Punjab mandis seeded in database
+- [x] `GET /api/v1/rates` endpoint — all latest rates with optional `?q=` search
+- [x] Frontend MarketRatesScreen — real API data, search, category filters, loading/error states
+- [x] Gateway proxy route for `/market/rates` (all rates)
+- [x] Unit conversion — AMIS Rs/100kg (quintal) → PKR/kg
+- [x] Session persistence — JWT restore on browser refresh, onboarding completion tracking
+- [x] Logout functionality — Settings screen wired to `tokenStorage.clearAll()`
+- [x] Weather service — multi-layer caching (current 15min, forecast 30min, LLM advisory 60min)
+- [x] Weather service — farmer location registration after signup
+- [x] All frontend screens — Splash, Onboarding, Language, Login, Home, Disease, Weather, Market, Helpline, Settings
+- [x] Cross-screen navigation — Home ↔ Disease ↔ Weather ↔ Market ↔ Helpline
+
+---
+
+## Pending Work & Roadmap
+
+> **Detailed task breakdown with checkboxes:** See [docs/PENDING_WORK.md](docs/PENDING_WORK.md)
+
+**25 total items reviewed** — 4 completed, 21 remaining across Critical / Medium / Low priorities.
 
 ---
 

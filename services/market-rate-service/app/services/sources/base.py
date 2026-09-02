@@ -18,8 +18,11 @@ class RawPrice:
 
     source: str            # amis / zarai_mandi / manual
     raw_crop: str          # e.g. "Gandum", "wheat_crop", "Basmati"
-    raw_price: float       # price in the source's own unit
-    raw_unit: str          # e.g. "40kg", "kg", "maund"
+    raw_price: float       # primary price (FQP or avg) in source unit
+    raw_unit: str          # e.g. "100kg", "kg", "40kg"
     mandi: str
     city: str = ""
     recorded_date: Optional[date] = None
+    raw_min_price: Optional[float] = None
+    raw_max_price: Optional[float] = None
+    raw_fqp_price: Optional[float] = None

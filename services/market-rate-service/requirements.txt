@@ -7,3 +7,4 @@ httpx
 beautifulsoup4
 redis
 apscheduler
+python-dotenv
