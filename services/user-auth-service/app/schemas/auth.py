@@ -59,3 +59,11 @@ class ResetPasswordRequest(BaseModel):
 class VerifySignupOTPRequest(BaseModel):
     email: EmailStr
     otp: str
+
+
+# =========================================================
+# REFRESH TOKEN
+# =========================================================
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str

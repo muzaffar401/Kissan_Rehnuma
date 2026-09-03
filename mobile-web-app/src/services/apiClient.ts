@@ -45,6 +45,9 @@ type OnUnauthorizedCallback = () => void;
 /** Optional callback invoked when a 401 is received */
 let onUnauthorized: OnUnauthorizedCallback | null = null;
 
+/** Lock to prevent multiple concurrent refresh attempts */
+let refreshPromise: Promise<boolean> | null = null;
+
 /**
  * Register a callback for 401 unauthorized responses.
  * Typically used to redirect user to login screen.
@@ -125,11 +128,70 @@ export async function apiRequest<T = unknown>(
       data = await response.text();
     }
 
-    // Handle 401 Unauthorized (token expired/invalid)
+    // Handle 401 Unauthorized — attempt silent refresh before giving up
     if (response.status === 401 && !skipAuth) {
-      // Clear invalid token
+      // Prevent concurrent refresh calls (multiple 401s at once)
+      if (!refreshPromise) {
+        refreshPromise = attemptRefresh().finally(() => {
+          refreshPromise = null;
+        });
+      }
+
+      const refreshed = await refreshPromise;
+
+      if (refreshed) {
+        // Got new token — retry the original request
+        const newToken = await tokenStorage.getAccessToken();
+        if (newToken) {
+          headers['Authorization'] = `Bearer ${newToken}`;
+        }
+
+        const retryController = new AbortController();
+        const retryTimeoutId = setTimeout(() => retryController.abort(), timeout);
+
+        try {
+          const retryResponse = await fetch(url, {
+            ...rest,
+            headers,
+            body: requestBody,
+            signal: retryController.signal,
+          });
+          clearTimeout(retryTimeoutId);
+
+          const retryContentType = retryResponse.headers.get('content-type') || '';
+          let retryData: unknown;
+          if (retryContentType.includes('application/json')) {
+            retryData = await retryResponse.json();
+          } else {
+            retryData = await retryResponse.text();
+          }
+
+          if (!retryResponse.ok) {
+            const retryError: ApiError = {
+              detail: typeof retryData === 'object' && retryData !== null
+                ? String((retryData as Record<string, unknown>).detail ?? 'Request failed')
+                : String(retryData ?? `Request failed with status ${retryResponse.status}`),
+              status: retryResponse.status,
+            };
+            throw retryError;
+          }
+
+          return retryData as T;
+        } catch (retryErr) {
+          clearTimeout(retryTimeoutId);
+          if (retryErr && typeof retryErr === 'object' && 'status' in retryErr) {
+            throw retryErr;
+          }
+          throw {
+            detail: 'Network error during retry.',
+            error_code: 'NETWORK_ERROR',
+            status: 0,
+          } satisfies ApiError;
+        }
+      }
+
+      // Refresh failed — clear tokens and logout
       await tokenStorage.clearAll();
-      // Notify listener (e.g., redirect to login)
       if (onUnauthorized) {
         onUnauthorized();
       }
@@ -229,3 +291,42 @@ export const api = {
     return apiRequest<T>(path, { ...options, method: 'DELETE' });
   },
 };
+
+// =========================================================
+// Token refresh (internal — avoids circular import with authService)
+// =========================================================
+
+/**
+ * Attempt to refresh the access token using the stored refresh token.
+ * Calls the refresh endpoint directly via apiRequest (no authService import).
+ * Returns true if refresh succeeded, false otherwise.
+ */
+async function attemptRefresh(): Promise<boolean> {
+  const refreshToken = await tokenStorage.getRefreshToken();
+  if (!refreshToken) return false;
+
+  try {
+    const url = `${API_BASE_URL}/auth/refresh`;
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+
+    if (!resp.ok) return false;
+
+    const data = await resp.json() as Record<string, string>;
+    if (data.access_token) {
+      await tokenStorage.saveAccessToken(data.access_token);
+      if (data.refresh_token) {
+        await tokenStorage.saveRefreshToken(data.refresh_token);
+      }
+      console.log('[ApiClient] Session refreshed successfully');
+      return true;
+    }
+    return false;
+  } catch {
+    console.log('[ApiClient] Refresh token invalid or expired');
+    return false;
+  }
+}

@@ -27,6 +27,7 @@ export interface LoginRequest {
 export interface LoginResponse {
   message: string;
   access_token: string;
+  refresh_token: string;
   token_type: string;
 }
 
@@ -60,6 +61,7 @@ export interface VerifyOtpResponse {
   email: string;
   email_verified: boolean;
   access_token: string;
+  refresh_token: string;
   token_type: string;
 }
 
@@ -93,6 +95,9 @@ export const authService = {
     // Store token and user info securely
     if (response.access_token) {
       await tokenStorage.saveAccessToken(response.access_token);
+      if (response.refresh_token) {
+        await tokenStorage.saveRefreshToken(response.refresh_token);
+      }
 
       // Decode basic user info from JWT payload (sub = user_id, name = farmer name)
       try {
@@ -124,13 +129,32 @@ export const authService = {
 
   /**
    * Verify signup OTP to activate account.
+   * On success, stores both access and refresh tokens.
    */
   async verifySignupOtp(data: VerifyOtpRequest): Promise<VerifyOtpResponse> {
-    return api.post<VerifyOtpResponse>(
+    const response = await api.post<VerifyOtpResponse>(
       ENDPOINTS.auth.verifySignupOtp,
       data,
       { skipAuth: true },
     );
+
+    // Store tokens from auto-login after OTP verification
+    if (response.access_token) {
+      await tokenStorage.saveAccessToken(response.access_token);
+      if (response.refresh_token) {
+        await tokenStorage.saveRefreshToken(response.refresh_token);
+      }
+      try {
+        const payload = decodeJWTPayload(response.access_token);
+        if (payload.sub && payload.email) {
+          await tokenStorage.saveUserInfo(payload.sub, payload.email, payload.name);
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    return response;
   },
 
   /**
@@ -153,6 +177,40 @@ export const authService = {
       data,
       { skipAuth: true },
     );
+  },
+
+  /**
+   * Refresh the session using the stored refresh token.
+   * Returns true if successful, false if refresh token is invalid/expired.
+   */
+  async refreshSession(): Promise<boolean> {
+    const refreshToken = await tokenStorage.getRefreshToken();
+    if (!refreshToken) return false;
+
+    try {
+      const response = await api.post<{
+        access_token: string;
+        refresh_token: string;
+        token_type: string;
+      }>(
+        ENDPOINTS.auth.refresh,
+        { refresh_token: refreshToken },
+        { skipAuth: true },
+      );
+
+      if (response.access_token) {
+        await tokenStorage.saveAccessToken(response.access_token);
+        if (response.refresh_token) {
+          await tokenStorage.saveRefreshToken(response.refresh_token);
+        }
+        console.log('[Auth] Session refreshed successfully');
+        return true;
+      }
+      return false;
+    } catch {
+      console.log('[Auth] Refresh token invalid or expired');
+      return false;
+    }
   },
 
   /**

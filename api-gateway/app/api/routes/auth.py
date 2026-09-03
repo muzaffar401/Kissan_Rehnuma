@@ -130,6 +130,17 @@ async def proxy_reset_password(request: Request):
 
 
 # =========================================================
+# POST /api/v1/auth/refresh  (public — rotates refresh token)
+# =========================================================
+
+@router.post("/refresh", summary="Refresh access token")
+@limiter.limit(RATE_LIMIT_DEFAULT)
+async def proxy_refresh_token(request: Request):
+    """Proxy to user-auth-service POST /api/v1/auth/refresh"""
+    return await _proxy_json(request, _get_target_url("/api/v1/auth/refresh"))
+
+
+# =========================================================
 # GET /api/v1/auth/health  (public)
 # =========================================================
 

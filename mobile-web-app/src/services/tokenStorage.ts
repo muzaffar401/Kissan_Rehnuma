@@ -15,6 +15,7 @@ import { Platform } from 'react-native';
 /** Storage keys */
 const KEYS = {
   ACCESS_TOKEN: 'kissan_access_token',
+  REFRESH_TOKEN: 'kissan_refresh_token',
   USER_EMAIL: 'kissan_user_email',
   USER_ID: 'kissan_user_id',
   USER_NAME: 'kissan_user_name',
@@ -68,6 +69,21 @@ export const tokenStorage = {
    */
   async getAccessToken(): Promise<string | null> {
     return storage.getItem(KEYS.ACCESS_TOKEN);
+  },
+
+  /**
+   * Save refresh token after successful login.
+   */
+  async saveRefreshToken(token: string): Promise<void> {
+    await storage.setItem(KEYS.REFRESH_TOKEN, token);
+  },
+
+  /**
+   * Get stored refresh token.
+   * Returns null if not found or expired.
+   */
+  async getRefreshToken(): Promise<string | null> {
+    return storage.getItem(KEYS.REFRESH_TOKEN);
   },
 
   /**
@@ -189,6 +205,7 @@ export const tokenStorage = {
   async clearAll(): Promise<void> {
     await Promise.all([
       storage.removeItem(KEYS.ACCESS_TOKEN),
+      storage.removeItem(KEYS.REFRESH_TOKEN),
       storage.removeItem(KEYS.USER_ID),
       storage.removeItem(KEYS.USER_EMAIL),
       storage.removeItem(KEYS.USER_NAME),
@@ -201,6 +218,7 @@ export const tokenStorage = {
   async clearAllIncludingOnboarding(): Promise<void> {
     await Promise.all([
       storage.removeItem(KEYS.ACCESS_TOKEN),
+      storage.removeItem(KEYS.REFRESH_TOKEN),
       storage.removeItem(KEYS.USER_ID),
       storage.removeItem(KEYS.USER_EMAIL),
       storage.removeItem(KEYS.USER_NAME),

@@ -15,13 +15,16 @@ from app.schemas.auth import (
     LoginRequest,
     ForgotPasswordRequest,
     VerifyOTPRequest,
-    ResetPasswordRequest
+    ResetPasswordRequest,
+    RefreshTokenRequest,
 )
 
 from app.core.security import (
     hash_password,
     verify_password,
-    create_access_token
+    create_access_token,
+    create_refresh_token,
+    verify_refresh_token,
 )
 
 from app.core.email import send_otp_email
@@ -227,11 +230,13 @@ def verify_signup_otp(
     _ensure_farmer_location(db, farmer.id, farmer.latitude, farmer.longitude)
 
     # Auto-login: issue JWT so the user can start using the app immediately
-    access_token = create_access_token({
+    token_data = {
         "sub": str(farmer.id),
         "email": farmer.email,
         "name": farmer.name
-    })
+    }
+    access_token = create_access_token(token_data)
+    refresh_token = create_refresh_token(token_data)
 
     return {
         "message": "Email verified successfully.",
@@ -239,6 +244,7 @@ def verify_signup_otp(
         "email": farmer.email,
         "email_verified": True,
         "access_token": access_token,
+        "refresh_token": refresh_token,
         "token_type": "bearer"
     }
 
@@ -296,18 +302,21 @@ def login(
     _ensure_farmer_location(db, farmer.id, farmer.latitude, farmer.longitude)
 
     # ---------------------------------------------------------
-    # CREATE ACCESS TOKEN
+    # CREATE ACCESS + REFRESH TOKENS
     # ---------------------------------------------------------
 
-    access_token = create_access_token({
+    token_data = {
         "sub": str(farmer.id),
         "email": farmer.email,
         "name": farmer.name
-    })
+    }
+    access_token = create_access_token(token_data)
+    refresh_token = create_refresh_token(token_data)
 
     return {
         "message": "Login successful",
         "access_token": access_token,
+        "refresh_token": refresh_token,
         "token_type": "bearer"
     }
 
@@ -495,4 +504,58 @@ def reset_password(
 
     return {
         "message": "Password reset successfully"
+    }
+
+
+# =========================================================
+# REFRESH TOKEN
+# =========================================================
+
+@router.post("/refresh")
+def refresh_token(
+    request: RefreshTokenRequest,
+    db: Session = Depends(get_db)
+):
+    """Exchange a valid refresh token for a new access + refresh token pair."""
+
+    # ---------------------------------------------------------
+    # VALIDATE REFRESH TOKEN
+    # ---------------------------------------------------------
+
+    payload = verify_refresh_token(request.refresh_token)
+    if payload is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired refresh token"
+        )
+
+    # ---------------------------------------------------------
+    # FIND FARMER
+    # ---------------------------------------------------------
+
+    farmer_id = payload.get("sub")
+    farmer = db.query(Farmer).filter(Farmer.id == int(farmer_id)).first()
+
+    if not farmer:
+        raise HTTPException(
+            status_code=401,
+            detail="User not found"
+        )
+
+    # ---------------------------------------------------------
+    # ISSUE NEW TOKEN PAIR (rotation)
+    # ---------------------------------------------------------
+
+    token_data = {
+        "sub": str(farmer.id),
+        "email": farmer.email,
+        "name": farmer.name
+    }
+    new_access_token = create_access_token(token_data)
+    new_refresh_token = create_refresh_token(token_data)
+
+    return {
+        "access_token": new_access_token,
+        "refresh_token": new_refresh_token,
+        "token_type": "bearer"
     }
