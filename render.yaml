@@ -1,0 +1,253 @@
+# ============================================================
+# Kissan Rehnuma — Render Blueprint
+# ============================================================
+# Infrastructure-as-Code for deploying all backend microservices
+# on Render.com Free tier.
+#
+# Official docs: https://render.com/docs/blueprint-spec
+#
+# Prerequisites:
+#   1. Neon Postgres databases created (see README or deployment guide)
+#   2. API keys for OpenRouter, Cloudinary (already set as sync:false)
+#   3. Push this file to your GitHub repo, then connect to Render
+#
+# Services:
+#   - api-gateway          (Python native, port $PORT)
+#   - user-auth-service    (Python native, port $PORT)
+#   - crop-disease-service (Docker, port $PORT)
+#   - animal-disease-service (Docker, port $PORT)
+#   - weather-alert-service (Python native, port $PORT)
+#   - market-rate-service  (Python native, port $PORT)
+# ============================================================
+
+services:
+
+  # ──────────────────────────────────────────────────────────
+  # API Gateway — single entry point for the frontend.
+  # Proxies requests to individual microservices.
+  # ──────────────────────────────────────────────────────────
+  - type: web
+    runtime: python
+    name: kissan-api-gateway
+    rootDir: api-gateway
+    plan: free
+    region: ohio
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: APP_ENV
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: LOG_LEVEL
+        value: INFO
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "60"
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      # Service URLs — auto-populated from deployed services
+      - key: CROP_DISEASE_SERVICE_URL
+        fromService:
+          name: kissan-crop-disease
+          type: web
+          property: url
+      - key: USER_AUTH_SERVICE_URL
+        fromService:
+          name: kissan-user-auth
+          type: web
+          property: url
+      - key: ANIMAL_DISEASE_SERVICE_URL
+        fromService:
+          name: kissan-animal-disease
+          type: web
+          property: url
+      - key: WEATHER_ALERT_SERVICE_URL
+        fromService:
+          name: kissan-weather-alert
+          type: web
+          property: url
+      - key: MARKET_RATE_SERVICE_URL
+        fromService:
+          name: kissan-market-rate
+          type: web
+          property: url
+
+  # ──────────────────────────────────────────────────────────
+  # User Auth Service — farmer registration, login, OTP,
+  # JWT token issuance. Owns the 'farmers' table.
+  # ──────────────────────────────────────────────────────────
+  - type: web
+    runtime: python
+    name: kissan-user-auth
+    rootDir: services/user-auth-service
+    plan: free
+    region: ohio
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: APP_ENV
+        value: production
+      - key: DEBUG
+        value: "false"
+      - fromGroup: kissan-shared
+      - key: JWT_EXPIRY_MINUTES
+        value: "1440"
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: MAIL_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+
+  # ──────────────────────────────────────────────────────────
+  # Crop Disease Service — AI-powered crop disease detection
+  # using vision LLM (OpenRouter/Gemini). Docker runtime
+  # because dependencies are managed via pyproject.toml + uv.
+  # ──────────────────────────────────────────────────────────
+  - type: web
+    runtime: docker
+    name: kissan-crop-disease
+    rootDir: services/crop-disease-service
+    plan: free
+    region: ohio
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: VISION_MODEL
+        value: google/gemini-2.5-flash
+      - key: VISION_TEMPERATURE
+        value: "0.1"
+      - key: VISION_MAX_TOKENS
+        value: "2048"
+      - key: CONFIDENCE_THRESHOLD
+        value: "0.70"
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: CLOUDINARY_FOLDER
+        value: kissan-rehnuma/crop-scans
+      - key: LANGSMITH_TRACING
+        value: "false"
+
+  # ──────────────────────────────────────────────────────────
+  # Animal Disease Service — AI-powered animal disease
+  # detection for livestock. Docker runtime (same as crop).
+  # ──────────────────────────────────────────────────────────
+  - type: web
+    runtime: docker
+    name: kissan-animal-disease
+    rootDir: services/animal-disease-service
+    plan: free
+    region: ohio
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: VISION_MODEL
+        value: google/gemini-2.5-flash
+      - key: VISION_TEMPERATURE
+        value: "0.3"
+      - key: VISION_MAX_TOKENS
+        value: "2048"
+      - key: CONFIDENCE_THRESHOLD
+        value: "0.70"
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: CLOUDINARY_FOLDER
+        value: kissan-rehnuma/animal-scans
+      - key: LANGSMITH_TRACING
+        value: "false"
+
+  # ──────────────────────────────────────────────────────────
+  # Weather Alert Service — weather monitoring, risk alerts,
+  # LLM-generated Roman-Urdu advisories. Shares 'farmers'
+  # table with user-auth-service.
+  # ──────────────────────────────────────────────────────────
+  - type: web
+    runtime: python
+    name: kissan-weather-alert
+    rootDir: services/weather-alert-service
+    plan: free
+    region: ohio
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: APP_ENV
+        value: production
+      - key: DEBUG
+        value: "false"
+      - fromGroup: kissan-shared
+      - key: SCHEDULER_ENABLED
+        value: "true"
+      - key: SCHEDULER_INTERVAL_MINUTES
+        value: "30"
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        value: google/gemini-2.5-flash
+      - key: LLM_MAX_TOKENS
+        value: "200"
+
+  # ──────────────────────────────────────────────────────────
+  # Market Rate Service — AMIS price scraping, caching,
+  # daily pipeline. Shares Farmers DB with auth/weather.
+  # Redis optional: falls back to in-process TTL cache.
+  # ──────────────────────────────────────────────────────────
+  - type: web
+    runtime: python
+    name: kissan-market-rate
+    rootDir: services/market-rate-service
+    plan: free
+    region: ohio
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - fromGroup: kissan-shared
+      - key: ADMIN_API_KEY
+        sync: false
+      - key: SCHEDULER_ENABLED
+        value: "true"
+      - key: SCHEDULER_HOUR
+        value: "7"
+      - key: RUN_PIPELINE_ON_STARTUP
+        value: "false"
+
+# Shared environment variables used by multiple services
+# (auth, weather, market all share the same Farmers database + JWT secret)
+envGroups:
+  - name: kissan-shared
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false

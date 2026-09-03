@@ -71,7 +71,7 @@ class Settings(BaseSettings):
         return self.app_env == "production"
 
     @model_validator(mode="after")
-    def _warn_missing_secrets(self) -> Self:
+    def _production_setup(self) -> Self:
         if self.app_env == "production":
             missing = []
             if not self.openrouter_api_key:
@@ -82,6 +82,14 @@ class Settings(BaseSettings):
                 raise ValueError(
                     f"Production requires these env vars: {', '.join(missing)}"
                 )
+            # Neon provides postgresql:// but async SQLAlchemy needs postgresql+asyncpg://
+            if self.database_url.startswith("postgresql://"):
+                self.database_url = self.database_url.replace(
+                    "postgresql://", "postgresql+asyncpg://", 1
+                )
+                if "sslmode" not in self.database_url:
+                    sep = "&" if "?" in self.database_url else "?"
+                    self.database_url += f"{sep}sslmode=require"
         return self
 
 

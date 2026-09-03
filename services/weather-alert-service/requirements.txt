@@ -8,3 +8,4 @@ pydantic
 apscheduler
 google-auth
 python-jose
+python-dotenv
