@@ -26,7 +26,8 @@ import {
   BeVietnamPro_500Medium,
   BeVietnamPro_600SemiBold,
 } from '@expo-google-fonts/be-vietnam-pro';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
+import type { ColorPalette } from '../theme/colors';
 import { useTranslation } from 'react-i18next';
 import { cropService, animalService, type DetectResponse, type AnimalDetectResponse, type ApiError } from '../services';
 import { pdfService } from '../services/pdfService';
@@ -74,6 +75,8 @@ export default function DiseaseScanScreen({
   initialTab = 'crop',
   onNavigate,
 }: DiseaseScanScreenProps) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const { t, i18n } = useTranslation();
   const { width } = useWindowDimensions();
   const [activeTab, setActiveTab] = useState<ScanTab>(initialTab);
@@ -633,7 +636,7 @@ export default function DiseaseScanScreen({
           return (
             <Pressable
               key={tab.key}
-              style={[styles.navItem, isActive && styles.navItemActive]}
+              style={styles.navItem}
               onPress={() => {
                 setBottomActive(tab.key);
                 if (tab.key === 'home') onNavigate?.('home');
@@ -642,14 +645,17 @@ export default function DiseaseScanScreen({
                 if (tab.key === 'helpline') onNavigate?.('helpline');
               }}
             >
+              {/* Active indicator bar */}
+              <View
+                style={[
+                  styles.navIndicatorBar,
+                  isActive && styles.navIndicatorBarActive,
+                ]}
+              />
               <MaterialCommunityIcons
                 name={tab.icon as any}
-                size={24}
-                color={
-                  isActive
-                    ? colors.onPrimaryContainer
-                    : colors.onSurfaceVariant
-                }
+                size={isActive ? 25 : 23}
+                color={isActive ? colors.primary : colors.onSurfaceVariant}
               />
               <Text
                 style={[
@@ -667,7 +673,7 @@ export default function DiseaseScanScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorPalette) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface,
@@ -1121,25 +1127,31 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   navItem: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 56,
-    paddingVertical: 4,
-    paddingHorizontal: 16,
-    borderRadius: 16,
+    paddingTop: 4,
+    paddingBottom: 2,
   },
-  navItemActive: {
-    backgroundColor: colors.primaryContainer,
-    borderRadius: 28,
+  navIndicatorBar: {
+    width: 24,
+    height: 3,
+    borderRadius: 1.5,
+    marginBottom: 6,
+    backgroundColor: 'transparent',
+  },
+  navIndicatorBarActive: {
+    backgroundColor: colors.primary,
   },
   navLabel: {
     fontFamily: 'BeVietnamPro_500Medium',
     fontSize: 12,
     fontWeight: '500',
-    marginTop: 4,
+    marginTop: 3,
   },
   navLabelActive: {
-    color: colors.onPrimaryContainer,
+    color: colors.primary,
+    fontWeight: '700',
   },
   navLabelInactive: {
     color: colors.onSurfaceVariant,

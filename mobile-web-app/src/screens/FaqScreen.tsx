@@ -23,7 +23,8 @@ import {
   BeVietnamPro_500Medium,
   BeVietnamPro_600SemiBold,
 } from '@expo-google-fonts/be-vietnam-pro';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
+import type { ColorPalette } from '../theme/colors';
 import { useTranslation } from 'react-i18next';
 
 // Enable LayoutAnimation on Android
@@ -47,6 +48,8 @@ const FAQS = [
 ];
 
 export default function FaqScreen({ onNavigate }: FaqScreenProps) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const [openFaq, setOpenFaq] = useState<string | null>(null);
@@ -159,7 +162,7 @@ export default function FaqScreen({ onNavigate }: FaqScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorPalette) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface,

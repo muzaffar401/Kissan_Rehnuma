@@ -26,7 +26,8 @@ import {
   BeVietnamPro_600SemiBold,
 } from '@expo-google-fonts/be-vietnam-pro';
 import { NotoNastaliqUrdu_400Regular } from '@expo-google-fonts/noto-nastaliq-urdu';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
+import type { ColorPalette } from '../theme/colors';
 import { useTranslation } from 'react-i18next';
 import { tokenStorage } from '../services/tokenStorage';
 import { authService } from '../services/authService';
@@ -70,6 +71,8 @@ const SETTINGS_ITEMS = [
 
 // Custom toggle switch component
 function ToggleSwitch({ value, onToggle }: { value: boolean; onToggle: () => void }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const translateX = value ? 24 : 0;
   const trackColor = value ? colors.primaryContainer : colors.surfaceVariant;
   const borderColor = value ? colors.primaryContainer : colors.outlineVariant;
@@ -94,6 +97,8 @@ function ToggleSwitch({ value, onToggle }: { value: boolean; onToggle: () => voi
 
 export default function SettingsScreen({ onNavigate }: SettingsScreenProps) {
   const { t } = useTranslation();
+  const { colors, isDark, toggleTheme } = useTheme();
+  const styles = createStyles(colors);
   const { width } = useWindowDimensions();
   const [bottomActive, setBottomActive] = useState<BottomTab>('home');
   const [toggles, setToggles] = useState<Record<string, boolean>>({
@@ -127,7 +132,7 @@ export default function SettingsScreen({ onNavigate }: SettingsScreenProps) {
       tokenStorage.getSetting(KEYS.SETTING_DARK_MODE, false),
       tokenStorage.getAvatarUri(),
     ]);
-    setToggles({ darkmode: darkOn });
+    setToggles({ darkmode: isDark });
     setAvatarUri(avatar);
 
     // Try to fetch full profile from database
@@ -167,9 +172,13 @@ export default function SettingsScreen({ onNavigate }: SettingsScreenProps) {
   }
 
   const handleToggle = async (id: string) => {
+    if (id === 'darkmode') {
+      await toggleTheme();
+      setToggles((prev) => ({ ...prev, darkmode: !isDark }));
+      return;
+    }
     const newVal = !toggles[id];
     setToggles((prev) => ({ ...prev, [id]: newVal }));
-    // Persist the toggle to storage
     const storageKey = id === 'darkmode'
       ? KEYS.SETTING_DARK_MODE
       : null;
@@ -390,7 +399,7 @@ export default function SettingsScreen({ onNavigate }: SettingsScreenProps) {
                     <MaterialCommunityIcons
                       name={item.icon as any}
                       size={24}
-                      color={colors.primaryContainer}
+                      color={colors.primary}
                     />
                     <View style={styles.settingsRowText}>
                       <Text style={styles.settingsRowTitle}>{t(item.titleKey)}</Text>
@@ -414,7 +423,7 @@ export default function SettingsScreen({ onNavigate }: SettingsScreenProps) {
                     <MaterialCommunityIcons
                       name={item.icon as any}
                       size={24}
-                      color={colors.primaryContainer}
+                      color={colors.primary}
                     />
                     <View style={styles.settingsRowText}>
                       <Text style={styles.settingsRowTitle}>{t(item.titleKey)}</Text>
@@ -452,7 +461,7 @@ export default function SettingsScreen({ onNavigate }: SettingsScreenProps) {
           return (
             <Pressable
               key={tab.key}
-              style={[styles.navItem, isActive && styles.navItemActive]}
+              style={styles.navItem}
               onPress={() => {
                 setBottomActive(tab.key);
                 if (tab.key === 'home' && onNavigate) onNavigate('home');
@@ -462,14 +471,17 @@ export default function SettingsScreen({ onNavigate }: SettingsScreenProps) {
                 if (tab.key === 'helpline' && onNavigate) onNavigate('helpline');
               }}
             >
+              {/* Active indicator bar */}
+              <View
+                style={[
+                  styles.navIndicatorBar,
+                  isActive && styles.navIndicatorBarActive,
+                ]}
+              />
               <MaterialCommunityIcons
                 name={tab.icon as any}
-                size={24}
-                color={
-                  isActive
-                    ? colors.onPrimaryContainer
-                    : colors.onSurfaceVariant
-                }
+                size={isActive ? 25 : 23}
+                color={isActive ? colors.primary : colors.onSurfaceVariant}
               />
               <Text
                 style={[
@@ -645,7 +657,7 @@ export default function SettingsScreen({ onNavigate }: SettingsScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorPalette) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface,
@@ -855,25 +867,31 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   navItem: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 56,
-    paddingVertical: 4,
-    paddingHorizontal: 16,
-    borderRadius: 16,
+    paddingTop: 4,
+    paddingBottom: 2,
   },
-  navItemActive: {
-    backgroundColor: colors.primaryContainer,
-    borderRadius: 28,
+  navIndicatorBar: {
+    width: 24,
+    height: 3,
+    borderRadius: 1.5,
+    marginBottom: 6,
+    backgroundColor: 'transparent',
+  },
+  navIndicatorBarActive: {
+    backgroundColor: colors.primary,
   },
   navLabel: {
     fontFamily: 'BeVietnamPro_500Medium',
     fontSize: 12,
     fontWeight: '500',
-    marginTop: 4,
+    marginTop: 3,
   },
   navLabelActive: {
-    color: colors.onPrimaryContainer,
+    color: colors.primary,
+    fontWeight: '700',
   },
   navLabelInactive: {
     color: colors.onSurfaceVariant,

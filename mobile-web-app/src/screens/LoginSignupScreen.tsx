@@ -22,7 +22,8 @@ import {
   BeVietnamPro_500Medium,
   BeVietnamPro_600SemiBold,
 } from '@expo-google-fonts/be-vietnam-pro';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
+import type { ColorPalette } from '../theme/colors';
 import { useTranslation } from 'react-i18next';
 import { authService } from '../services/authService';
 import { weatherService } from '../services/weatherService';
@@ -78,6 +79,8 @@ function FormInput({
   value: string;
   onChangeText: (text: string) => void;
 }) {
+  const { colors } = useTheme();
+  const inpStyles = createInputStyles(colors);
   const borderColor = useRef(new Animated.Value(0)).current;
 
   const animateFocus = (isFocused: boolean) => {
@@ -95,11 +98,11 @@ function FormInput({
   });
 
   return (
-    <View style={inputStyles.container}>
-      <Text style={inputStyles.label}>{label}</Text>
-      <Animated.View style={[inputStyles.inputWrapper, { borderColor: interpolatedBorder }]}>
+    <View style={inpStyles.container}>
+      <Text style={inpStyles.label}>{label}</Text>
+      <Animated.View style={[inpStyles.inputWrapper, { borderColor: interpolatedBorder }]}>
         <TextInput
-          style={inputStyles.input}
+          style={inpStyles.input}
           placeholder={placeholder}
           placeholderTextColor={colors.outlineVariant}
           secureTextEntry={secureTextEntry}
@@ -134,6 +137,8 @@ function OtpStep({
   onVerified: () => void;
   onBack: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const { t } = useTranslation();
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
@@ -199,6 +204,8 @@ function OtpStep({
 // ── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function LoginSignupScreen({ onComplete }: LoginSignupScreenProps) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
   const [showOtp, setShowOtp] = useState(false);
@@ -523,7 +530,7 @@ export default function LoginSignupScreen({ onComplete }: LoginSignupScreenProps
   );
 }
 
-const inputStyles = StyleSheet.create({
+const createInputStyles = (colors: ColorPalette) => StyleSheet.create({
   container: { gap: 4 },
   label: {
     fontFamily: 'BeVietnamPro_600SemiBold',
@@ -533,7 +540,7 @@ const inputStyles = StyleSheet.create({
     marginLeft: 4,
     letterSpacing: 0.14,
   },
-  inputWrapper: { borderWidth: 2, borderRadius: 8, backgroundColor: '#ffffff', overflow: 'hidden' },
+  inputWrapper: { borderWidth: 2, borderRadius: 8, backgroundColor: colors.surfaceContainerLowest, overflow: 'hidden' },
   input: {
     height: 56,
     paddingHorizontal: 16,
@@ -544,7 +551,7 @@ const inputStyles = StyleSheet.create({
   },
 });
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorPalette) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   bgBlobTopLeft: {
     position: 'absolute', top: -80, left: -80, width: 300, height: 300,
@@ -567,11 +574,11 @@ const styles = StyleSheet.create({
   scrollContent: { flex: 1 },
   scrollContentContainer: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 24 },
   glassPanel: {
-    backgroundColor: 'rgba(255, 248, 242, 0.92)',
+    backgroundColor: colors.surface === '#fff8f2' ? 'rgba(255, 248, 242, 0.92)' : 'rgba(30, 31, 26, 0.92)',
     borderRadius: 12, padding: 24, gap: 24,
     shadowColor: '#4A453C', shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06, shadowRadius: 24, elevation: 8,
-    borderWidth: 1, borderColor: 'rgba(234, 225, 213, 0.5)',
+    borderWidth: 1, borderColor: colors.surface === '#fff8f2' ? 'rgba(234, 225, 213, 0.5)' : 'rgba(65, 73, 65, 0.5)',
     maxWidth: 448, width: '100%', alignSelf: 'center',
   },
   cardHeader: { alignItems: 'center', gap: 8 },

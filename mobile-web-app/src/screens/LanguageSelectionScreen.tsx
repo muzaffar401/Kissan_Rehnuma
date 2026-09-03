@@ -3,7 +3,8 @@ import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-nativ
 import { useFonts, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans';
 import { BeVietnamPro_400Regular, BeVietnamPro_500Medium, BeVietnamPro_600SemiBold } from '@expo-google-fonts/be-vietnam-pro';
 import { NotoNastaliqUrdu_400Regular } from '@expo-google-fonts/noto-nastaliq-urdu';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
+import type { ColorPalette } from '../theme/colors';
 import { tokenStorage } from '../services/tokenStorage';
 import { useTranslation } from 'react-i18next';
 import i18n from '../i18n';
@@ -36,6 +37,8 @@ const languages = [
 ];
 
 export default function LanguageSelectionScreen({ onComplete }: LanguageSelectionScreenProps) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const { t } = useTranslation();
   const [selected, setSelected] = useState<string | null>(null);
   const [fontsLoaded] = useFonts({
@@ -107,7 +110,7 @@ export default function LanguageSelectionScreen({ onComplete }: LanguageSelectio
   };
 
   if (!fontsLoaded) {
-    return <View style={styles.container} />;
+    return <View style={createStyles(colors).container} />;
   }
 
   return (
@@ -190,7 +193,7 @@ export default function LanguageSelectionScreen({ onComplete }: LanguageSelectio
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorPalette) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,

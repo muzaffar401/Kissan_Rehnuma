@@ -23,7 +23,8 @@ import {
   BeVietnamPro_500Medium,
   BeVietnamPro_600SemiBold,
 } from '@expo-google-fonts/be-vietnam-pro';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
+import type { ColorPalette } from '../theme/colors';
 import { useTranslation } from 'react-i18next';
 import { marketService, type CropPrice } from '../services/marketService';
 import { CROP_NAME_KEYS } from '../services/cropTranslations';
@@ -89,6 +90,8 @@ function formatPrice(price: number | null): string {
 }
 
 export default function MarketRatesScreen({ onNavigate }: MarketRatesScreenProps) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const [bottomActive, setBottomActive] = useState<BottomTab>('market');
@@ -166,7 +169,7 @@ export default function MarketRatesScreen({ onNavigate }: MarketRatesScreenProps
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Top App Bar */}
       <View style={styles.appBar}>
-        <Pressable style={styles.appBarBtn}>
+        <Pressable style={styles.appBarBtn} onPress={() => onNavigate?.('home')}>
           <MaterialCommunityIcons
             name="tractor-variant"
             size={24}
@@ -174,9 +177,9 @@ export default function MarketRatesScreen({ onNavigate }: MarketRatesScreenProps
           />
         </Pressable>
         <Text style={styles.appBarTitle}>{t('common.appName')}</Text>
-        <Pressable style={styles.appBarBtn}>
+        <Pressable style={styles.appBarBtn} onPress={() => onNavigate?.('settings')}>
           <MaterialCommunityIcons
-            name="account-circle"
+            name="cog"
             size={24}
             color={colors.onSurfaceVariant}
           />
@@ -364,7 +367,7 @@ export default function MarketRatesScreen({ onNavigate }: MarketRatesScreenProps
           return (
             <Pressable
               key={tab.key}
-              style={[styles.navItem, isActive && styles.navItemActive]}
+              style={styles.navItem}
               onPress={() => {
                 setBottomActive(tab.key);
                 if (tab.key === 'home' && onNavigate) onNavigate('home');
@@ -373,14 +376,17 @@ export default function MarketRatesScreen({ onNavigate }: MarketRatesScreenProps
                 if (tab.key === 'helpline' && onNavigate) onNavigate('helpline');
               }}
             >
+              {/* Active indicator bar */}
+              <View
+                style={[
+                  styles.navIndicatorBar,
+                  isActive && styles.navIndicatorBarActive,
+                ]}
+              />
               <MaterialCommunityIcons
                 name={tab.icon as any}
-                size={24}
-                color={
-                  isActive
-                    ? colors.onPrimaryContainer
-                    : colors.onSurfaceVariant
-                }
+                size={isActive ? 25 : 23}
+                color={isActive ? colors.primary : colors.onSurfaceVariant}
               />
               <Text
                 style={[
@@ -398,7 +404,7 @@ export default function MarketRatesScreen({ onNavigate }: MarketRatesScreenProps
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorPalette) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surface },
   appBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -553,14 +559,16 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08, shadowRadius: 3, elevation: 8,
   },
   navItem: {
+    flex: 1,
     alignItems: 'center', justifyContent: 'center',
-    minWidth: 56, paddingVertical: 4, paddingHorizontal: 16, borderRadius: 16,
+    paddingTop: 4, paddingBottom: 2,
   },
-  navItemActive: { backgroundColor: colors.primaryContainer, borderRadius: 28 },
+  navIndicatorBar: { width: 24, height: 3, borderRadius: 1.5, marginBottom: 6, backgroundColor: 'transparent' },
+  navIndicatorBarActive: { backgroundColor: colors.primary },
   navLabel: {
     fontFamily: 'BeVietnamPro_500Medium', fontSize: 12,
-    fontWeight: '500', marginTop: 4,
+    fontWeight: '500', marginTop: 3,
   },
-  navLabelActive: { color: colors.onPrimaryContainer },
+  navLabelActive: { color: colors.primary, fontWeight: '700' },
   navLabelInactive: { color: colors.onSurfaceVariant },
 });

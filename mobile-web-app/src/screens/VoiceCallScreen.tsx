@@ -36,7 +36,8 @@ import {
   createLocalAudioTrack,
 } from 'livekit-client';
 import type { RemoteTrack, TrackPublication, Participant } from 'livekit-client';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
+import type { ColorPalette } from '../theme/colors';
 import { useTranslation } from 'react-i18next';
 import { tokenStorage } from '../services/tokenStorage';
 import { fetchVoiceToken, generateRoomName } from '../services/helplineService';
@@ -57,6 +58,8 @@ interface VoiceCallScreenProps {
 // ---------------------------------------------------------------------------
 
 export default function VoiceCallScreen({ onNavigate }: VoiceCallScreenProps) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const { t } = useTranslation();
   const [fontsLoaded] = useFonts({
     BeVietnamPro_400Regular,
@@ -493,7 +496,7 @@ export default function VoiceCallScreen({ onNavigate }: VoiceCallScreenProps) {
 // Styles
 // ---------------------------------------------------------------------------
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorPalette) => StyleSheet.create({
   container: {
     flex: 1,
   },

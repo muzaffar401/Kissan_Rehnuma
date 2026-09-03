@@ -3,7 +3,8 @@ import { Animated, Easing, Image, ImageStyle, StyleSheet, Text, View } from 'rea
 import { useFonts, PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans';
 import { BeVietnamPro_400Regular } from '@expo-google-fonts/be-vietnam-pro';
 import { NotoNastaliqUrdu_400Regular } from '@expo-google-fonts/noto-nastaliq-urdu';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
+import type { ColorPalette } from '../theme/colors';
 import { useTranslation } from 'react-i18next';
 
 interface SplashScreenProps {
@@ -11,6 +12,8 @@ interface SplashScreenProps {
 }
 
 export default function SplashScreen({ onComplete }: SplashScreenProps) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const { t } = useTranslation();
   const scaleAnim = useRef(new Animated.Value(0.6)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
@@ -93,7 +96,7 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
   }, [fontsLoaded]);
 
   if (!fontsLoaded) {
-    return <View style={styles.container} />;
+    return <View style={createStyles(colors).container} />;
   }
 
   const getDotStyle = (anim: Animated.Value) => ({
@@ -144,7 +147,7 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorPalette) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.primaryContainer,

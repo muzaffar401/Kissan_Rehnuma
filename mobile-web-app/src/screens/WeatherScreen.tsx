@@ -23,7 +23,8 @@ import {
   BeVietnamPro_500Medium,
   BeVietnamPro_600SemiBold,
 } from '@expo-google-fonts/be-vietnam-pro';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
+import type { ColorPalette } from '../theme/colors';
 import { useTranslation } from 'react-i18next';
 import i18n from '../i18n';
 import { weatherService, CurrentWeatherResponse, ForecastEntry, AlertHistoryItem, AdvisoryResponse } from '../services/weatherService';
@@ -100,6 +101,8 @@ function groupForecastByDay(entries: ForecastEntry[]): ForecastEntry[] {
 // Derive farmer advice from current weather — REMOVED, now LLM-based via backend
 
 export default function WeatherScreen({ onNavigate }: WeatherScreenProps) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const [bottomActive, setBottomActive] = useState<BottomTab>('weather');
@@ -159,14 +162,12 @@ export default function WeatherScreen({ onNavigate }: WeatherScreenProps) {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Top App Bar */}
       <View style={styles.appBar}>
-        <View style={styles.appBarLeft}>
-          <Pressable style={styles.appBarBackBtn} onPress={() => onNavigate?.('home')}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color={colors.primary} />
-          </Pressable>
-          <Text style={styles.appBarTitle}>{t('common.appName')}</Text>
-        </View>
-        <Pressable style={styles.appBarProfileBtn} onPress={() => fetchData(true)}>
-          <MaterialCommunityIcons name="refresh" size={24} color={colors.onSurfaceVariant} />
+        <Pressable style={styles.appBarBackBtn} onPress={() => onNavigate?.('home')}>
+          <MaterialCommunityIcons name="arrow-left" size={24} color={colors.onSurfaceVariant} />
+        </Pressable>
+        <Text style={styles.appBarTitle}>{t('common.appName')}</Text>
+        <Pressable style={styles.appBarProfileBtn} onPress={() => onNavigate?.('settings')}>
+          <MaterialCommunityIcons name="cog" size={24} color={colors.onSurfaceVariant} />
         </Pressable>
       </View>
 
@@ -306,16 +307,23 @@ export default function WeatherScreen({ onNavigate }: WeatherScreenProps) {
           return (
             <Pressable
               key={tab.key}
-              style={[styles.navItem, isActive && styles.navItemActive]}
+              style={styles.navItem}
               onPress={() => {
                 setBottomActive(tab.key);
                 if (tab.key !== 'weather' && onNavigate) onNavigate(tab.key);
               }}
             >
+              {/* Active indicator bar */}
+              <View
+                style={[
+                  styles.navIndicatorBar,
+                  isActive && styles.navIndicatorBarActive,
+                ]}
+              />
               <MaterialCommunityIcons
                 name={tab.icon as any}
-                size={24}
-                color={isActive ? colors.onPrimaryContainer : colors.onSurfaceVariant}
+                size={isActive ? 25 : 23}
+                color={isActive ? colors.primary : colors.onSurfaceVariant}
               />
               <Text style={[styles.navLabel, isActive ? styles.navLabelActive : styles.navLabelInactive]}>
                 {t(tab.labelKey)}
@@ -328,7 +336,7 @@ export default function WeatherScreen({ onNavigate }: WeatherScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorPalette) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surface },
   appBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -336,9 +344,8 @@ const styles = StyleSheet.create({
     shadowColor: '#4A453C', shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05, shadowRadius: 3, elevation: 4,
   },
-  appBarLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  appBarBackBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20, marginLeft: -8 },
-  appBarTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 20, fontWeight: '700', color: colors.primary },
+  appBarBackBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20 },
+  appBarTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 20, fontWeight: '700', color: colors.primary, flex: 1, textAlign: 'center' },
   appBarProfileBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20 },
   scrollView: { flex: 1 },
   scrollContent: { paddingVertical: 16, gap: 24, alignSelf: 'center' as const, width: '100%', paddingHorizontal: 20 },
@@ -379,9 +386,10 @@ const styles = StyleSheet.create({
   forecastHigh: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16, fontWeight: '700', color: colors.onSurface },
   forecastLow: { fontFamily: 'BeVietnamPro_500Medium', fontSize: 12, fontWeight: '500', color: colors.onSurfaceVariant },
   bottomNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', backgroundColor: colors.surfaceContainer, height: 80, paddingHorizontal: 8, paddingBottom: Platform.OS === 'ios' ? 20 : 8, borderTopWidth: 1, borderTopColor: colors.surfaceDim, shadowColor: '#4A453C', shadowOffset: { width: 0, height: -1 }, shadowOpacity: 0.08, shadowRadius: 3, elevation: 8 },
-  navItem: { alignItems: 'center', justifyContent: 'center', minWidth: 56, paddingVertical: 4, paddingHorizontal: 16, borderRadius: 16 },
-  navItemActive: { backgroundColor: colors.primaryContainer, borderRadius: 28 },
-  navLabel: { fontFamily: 'BeVietnamPro_500Medium', fontSize: 12, fontWeight: '500', marginTop: 4 },
-  navLabelActive: { color: colors.onPrimaryContainer },
+  navItem: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 4, paddingBottom: 2 },
+  navIndicatorBar: { width: 24, height: 3, borderRadius: 1.5, marginBottom: 6, backgroundColor: 'transparent' },
+  navIndicatorBarActive: { backgroundColor: colors.primary },
+  navLabel: { fontFamily: 'BeVietnamPro_500Medium', fontSize: 12, fontWeight: '500', marginTop: 3 },
+  navLabelActive: { color: colors.primary, fontWeight: '700' },
   navLabelInactive: { color: colors.onSurfaceVariant },
 });

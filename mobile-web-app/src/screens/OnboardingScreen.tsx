@@ -3,7 +3,8 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import CrossPager, { CrossPagerRef } from '../components/PagerView';
 import { useFonts, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans';
 import { BeVietnamPro_400Regular, BeVietnamPro_600SemiBold } from '@expo-google-fonts/be-vietnam-pro';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
+import type { ColorPalette } from '../theme/colors';
 import { useTranslation } from 'react-i18next';
 import { tokenStorage } from '../services/tokenStorage';
 
@@ -45,6 +46,8 @@ interface OnboardingScreenProps {
 }
 
 export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const { t } = useTranslation();
   const [currentPage, setCurrentPage] = useState(0);
   const pagerRef = useRef<CrossPagerRef>(null);
@@ -127,7 +130,7 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorPalette) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -173,7 +176,7 @@ const styles = StyleSheet.create({
   imageContainer: {
     width: '100%',
     aspectRatio: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surfaceContainerLowest,
     borderRadius: 32,
     marginBottom: 24,
     alignItems: 'center',

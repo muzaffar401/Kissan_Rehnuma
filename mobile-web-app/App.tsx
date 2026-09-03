@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, I18nManager } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
-import { colors } from './src/theme/colors';
+import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { tokenStorage } from './src/services/tokenStorage';
 import i18n, { isRTL } from './src/i18n';
 import SplashScreenView from './src/screens/SplashScreen';
@@ -27,6 +27,17 @@ SplashScreen.preventAutoHideAsync().catch(() => {
 type Screen = 'loading' | 'splash' | 'onboarding' | 'language' | 'login' | 'home' | 'disease' | 'history' | 'weather' | 'market' | 'helpline' | 'voice-call' | 'settings' | 'faq';
 
 export default function App() {
+  return (
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+      <ThemeProvider>
+        <AppInner />
+      </ThemeProvider>
+    </SafeAreaProvider>
+  );
+}
+
+function AppInner() {
+  const { colors } = useTheme();
   const [currentScreen, setCurrentScreen] = useState<Screen>('loading');
 
   useEffect(() => {
@@ -120,9 +131,5 @@ export default function App() {
     return <HomeDashboard onNavigate={(s) => setCurrentScreen(s as Screen)} />;
   };
 
-  return (
-    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-      {renderScreen()}
-    </SafeAreaProvider>
-  );
+  return renderScreen();
 }
