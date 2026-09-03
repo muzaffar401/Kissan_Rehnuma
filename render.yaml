@@ -95,7 +95,10 @@ services:
         value: production
       - key: DEBUG
         value: "false"
-      - fromGroup: kissan-shared
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false
       - key: JWT_EXPIRY_MINUTES
         value: "1440"
       - key: SMTP_HOST
@@ -204,7 +207,10 @@ services:
         value: production
       - key: DEBUG
         value: "false"
-      - fromGroup: kissan-shared
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false
       - key: SCHEDULER_ENABLED
         value: "true"
       - key: SCHEDULER_INTERVAL_MINUTES
@@ -232,7 +238,8 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.12"
-      - fromGroup: kissan-shared
+      - key: DATABASE_URL
+        sync: false
       - key: ADMIN_API_KEY
         sync: false
       - key: SCHEDULER_ENABLED
@@ -242,12 +249,3 @@ services:
       - key: RUN_PIPELINE_ON_STARTUP
         value: "false"
 
-# Shared environment variables used by multiple services
-# (auth, weather, market all share the same Farmers database + JWT secret)
-envGroups:
-  - name: kissan-shared
-    envVars:
-      - key: DATABASE_URL
-        sync: false
-      - key: JWT_SECRET_KEY
-        sync: false
