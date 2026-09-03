@@ -224,13 +224,13 @@ export default function HomeDashboard({ onNavigate }: HomeDashboardProps) {
           <MaterialCommunityIcons
             name="tractor-variant"
             size={24}
-            color={colors.onSurfaceVariant}
+            color={colors.primary}
           />
         </Pressable>
         <Text style={styles.appBarTitle}>{t('common.appName')}</Text>
         <Pressable style={styles.appBarButton} onPress={() => onNavigate?.('settings')}>
           <MaterialCommunityIcons
-            name="account-circle"
+            name="cog"
             size={24}
             color={colors.onSurfaceVariant}
           />
@@ -452,11 +452,11 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.surfaceContainer,
   },
   appBarButton: {
-    width: 56,
-    height: 56,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 28,
+    borderRadius: 22,
   },
   appBarTitle: {
     fontFamily: 'PlusJakartaSans_700Bold',

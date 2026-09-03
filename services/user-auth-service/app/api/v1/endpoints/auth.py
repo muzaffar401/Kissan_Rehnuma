@@ -1,7 +1,7 @@
 import random
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -17,6 +17,8 @@ from app.schemas.auth import (
     VerifyOTPRequest,
     ResetPasswordRequest,
     RefreshTokenRequest,
+    ProfileResponse,
+    ProfileUpdateRequest,
 )
 
 from app.core.security import (
@@ -25,6 +27,7 @@ from app.core.security import (
     create_access_token,
     create_refresh_token,
     verify_refresh_token,
+    decode_access_token,
 )
 
 from app.core.email import send_otp_email
@@ -558,4 +561,97 @@ def refresh_token(
         "access_token": new_access_token,
         "refresh_token": new_refresh_token,
         "token_type": "bearer"
+    }
+
+
+# =========================================================
+# Helper: extract farmer_id from Bearer token
+# =========================================================
+
+def _get_farmer_id_from_request(request: Request) -> int:
+    """Extract and validate farmer_id from Authorization header."""
+    auth_header = request.headers.get("authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+    token = auth_header[7:]  # strip "Bearer "
+    payload = decode_access_token(token)
+    if payload is None:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    farmer_id = payload.get("sub")
+    if not farmer_id:
+        raise HTTPException(status_code=401, detail="Token missing user ID")
+    return int(farmer_id)
+
+
+# =========================================================
+# GET /auth/profile  (protected)
+# =========================================================
+
+@router.get("/profile")
+def get_profile(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Get the authenticated farmer's profile from the database."""
+    farmer_id = _get_farmer_id_from_request(request)
+
+    farmer = db.query(Farmer).filter(Farmer.id == farmer_id).first()
+    if not farmer:
+        raise HTTPException(status_code=404, detail="Farmer not found")
+
+    return {
+        "id": farmer.id,
+        "name": farmer.name,
+        "lastname": farmer.lastname,
+        "email": farmer.email,
+        "cnic": farmer.cnic,
+        "mobile_number": farmer.Mobile_Number,
+        "address": farmer.Address,
+        "city": farmer.City,
+        "country": farmer.country,
+    }
+
+
+# =========================================================
+# PUT /auth/profile  (protected)
+# =========================================================
+
+@router.put("/profile")
+def update_profile(
+    request: Request,
+    updates: ProfileUpdateRequest,
+    db: Session = Depends(get_db),
+):
+    """Update the authenticated farmer's profile fields."""
+    farmer_id = _get_farmer_id_from_request(request)
+
+    farmer = db.query(Farmer).filter(Farmer.id == farmer_id).first()
+    if not farmer:
+        raise HTTPException(status_code=404, detail="Farmer not found")
+
+    # Apply only non-None fields
+    if updates.name is not None:
+        farmer.name = updates.name
+    if updates.lastname is not None:
+        farmer.lastname = updates.lastname
+    if updates.city is not None:
+        farmer.City = updates.city
+    if updates.country is not None:
+        farmer.country = updates.country
+    if updates.address is not None:
+        farmer.Address = updates.address
+    if updates.mobile_number is not None:
+        farmer.Mobile_Number = updates.mobile_number
+
+    db.commit()
+    db.refresh(farmer)
+
+    return {
+        "message": "Profile updated successfully",
+        "id": farmer.id,
+        "name": farmer.name,
+        "lastname": farmer.lastname,
+        "email": farmer.email,
+        "city": farmer.City,
+        "country": farmer.country,
     }

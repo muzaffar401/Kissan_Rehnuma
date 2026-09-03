@@ -76,6 +76,27 @@ export interface ResetPasswordRequest {
   confirm_password: string;
 }
 
+export interface ProfileResponse {
+  id: number;
+  name: string;
+  lastname: string;
+  email: string;
+  cnic: string;
+  mobile_number: string;
+  address: string;
+  city: string;
+  country: string;
+}
+
+export interface ProfileUpdateRequest {
+  name?: string;
+  lastname?: string;
+  city?: string;
+  country?: string;
+  address?: string;
+  mobile_number?: string;
+}
+
 // =========================================================
 // Auth Service
 // =========================================================
@@ -239,6 +260,21 @@ export const authService = {
    */
   async getUserEmail(): Promise<string | null> {
     return tokenStorage.getUserEmail();
+  },
+
+  /**
+   * Fetch the authenticated farmer's profile from the database.
+   */
+  async getProfile(): Promise<ProfileResponse> {
+    return api.get<ProfileResponse>(ENDPOINTS.auth.profile);
+  },
+
+  /**
+   * Update the authenticated farmer's profile.
+   * Only sends non-undefined fields.
+   */
+  async updateProfile(data: ProfileUpdateRequest): Promise<ProfileResponse> {
+    return api.put<ProfileResponse>(ENDPOINTS.auth.profile, data);
   },
 };
 

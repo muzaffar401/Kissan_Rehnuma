@@ -19,8 +19,13 @@ const KEYS = {
   USER_EMAIL: 'kissan_user_email',
   USER_ID: 'kissan_user_id',
   USER_NAME: 'kissan_user_name',
+  USER_CITY: 'kissan_user_city',
+  USER_COUNTRY: 'kissan_user_country',
   ONBOARDING_COMPLETE: 'kissan_onboarding_complete',
   APP_LANGUAGE: 'kissan_app_language',
+  SETTING_NOTIFICATIONS: 'kissan_setting_notifications',
+  SETTING_DARK_MODE: 'kissan_setting_dark_mode',
+  USER_AVATAR: 'kissan_user_avatar',
 } as const;
 
 /**
@@ -89,13 +94,19 @@ export const tokenStorage = {
   /**
    * Save user info after login.
    */
-  async saveUserInfo(userId: string, email: string, name?: string): Promise<void> {
+  async saveUserInfo(userId: string, email: string, name?: string, city?: string, country?: string): Promise<void> {
     const promises: Promise<void>[] = [
       storage.setItem(KEYS.USER_ID, userId),
       storage.setItem(KEYS.USER_EMAIL, email),
     ];
     if (name) {
       promises.push(storage.setItem(KEYS.USER_NAME, name));
+    }
+    if (city) {
+      promises.push(storage.setItem(KEYS.USER_CITY, city));
+    }
+    if (country) {
+      promises.push(storage.setItem(KEYS.USER_COUNTRY, country));
     }
     await Promise.all(promises);
   },
@@ -140,6 +151,68 @@ export const tokenStorage = {
       // ignore decode errors
     }
     return null;
+  },
+
+  /**
+   * Get stored user city.
+   */
+  async getUserCity(): Promise<string | null> {
+    return storage.getItem(KEYS.USER_CITY);
+  },
+
+  /**
+   * Get stored user country.
+   */
+  async getUserCountry(): Promise<string | null> {
+    return storage.getItem(KEYS.USER_COUNTRY);
+  },
+
+  /**
+   * Get user location as "City, Country" string.
+   */
+  async getUserLocation(): Promise<string | null> {
+    const city = await this.getUserCity();
+    const country = await this.getUserCountry();
+    if (city && country) return `${city}, ${country}`;
+    if (city) return city;
+    if (country) return country;
+    return null;
+  },
+
+  // ─── Avatar ───
+
+  /**
+   * Save profile avatar image URI (local file or remote URL).
+   */
+  async setAvatarUri(uri: string): Promise<void> {
+    await storage.setItem(KEYS.USER_AVATAR, uri);
+  },
+
+  /**
+   * Get stored avatar image URI. Returns null if not set.
+   */
+  async getAvatarUri(): Promise<string | null> {
+    return storage.getItem(KEYS.USER_AVATAR);
+  },
+
+  // ─── Profile update ───
+
+  /**
+   * Update user profile fields (name, city, country).
+   * Only updates fields that are provided (non-undefined).
+   */
+  async updateProfile(updates: { name?: string; city?: string; country?: string }): Promise<void> {
+    const promises: Promise<void>[] = [];
+    if (updates.name !== undefined) {
+      promises.push(storage.setItem(KEYS.USER_NAME, updates.name));
+    }
+    if (updates.city !== undefined) {
+      promises.push(storage.setItem(KEYS.USER_CITY, updates.city));
+    }
+    if (updates.country !== undefined) {
+      promises.push(storage.setItem(KEYS.USER_COUNTRY, updates.country));
+    }
+    await Promise.all(promises);
   },
 
   /**
@@ -199,6 +272,24 @@ export const tokenStorage = {
     return storage.getItem(KEYS.APP_LANGUAGE);
   },
 
+  // ─── Settings persistence ───
+
+  /**
+   * Save a boolean setting (e.g. notifications, dark mode).
+   */
+  async setSetting(key: string, value: boolean): Promise<void> {
+    await storage.setItem(key, value ? 'true' : 'false');
+  },
+
+  /**
+   * Get a boolean setting. Returns the provided default if not set.
+   */
+  async getSetting(key: string, defaultValue: boolean): Promise<boolean> {
+    const val = await storage.getItem(key);
+    if (val === null) return defaultValue;
+    return val === 'true';
+  },
+
   /**
    * Clear all stored auth data (logout).
    */
@@ -209,6 +300,9 @@ export const tokenStorage = {
       storage.removeItem(KEYS.USER_ID),
       storage.removeItem(KEYS.USER_EMAIL),
       storage.removeItem(KEYS.USER_NAME),
+      storage.removeItem(KEYS.USER_CITY),
+      storage.removeItem(KEYS.USER_COUNTRY),
+      storage.removeItem(KEYS.USER_AVATAR),
     ]);
   },
 
@@ -222,6 +316,9 @@ export const tokenStorage = {
       storage.removeItem(KEYS.USER_ID),
       storage.removeItem(KEYS.USER_EMAIL),
       storage.removeItem(KEYS.USER_NAME),
+      storage.removeItem(KEYS.USER_CITY),
+      storage.removeItem(KEYS.USER_COUNTRY),
+      storage.removeItem(KEYS.USER_AVATAR),
       storage.removeItem(KEYS.ONBOARDING_COMPLETE),
       storage.removeItem(KEYS.APP_LANGUAGE),
     ]);

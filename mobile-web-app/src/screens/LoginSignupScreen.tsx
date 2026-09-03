@@ -120,11 +120,17 @@ function FormInput({
 function OtpStep({
   email,
   gpsCoords,
+  name,
+  city,
+  country,
   onVerified,
   onBack,
 }: {
   email: string;
   gpsCoords: { latitude: number; longitude: number } | null;
+  name?: string;
+  city?: string;
+  country?: string;
   onVerified: () => void;
   onBack: () => void;
 }) {
@@ -144,7 +150,7 @@ function OtpStep({
       // Auto-login: save JWT token
       if (response.access_token) {
         await tokenStorage.saveAccessToken(response.access_token);
-        await tokenStorage.saveUserInfo(String(response.farmer_id), response.email);
+        await tokenStorage.saveUserInfo(String(response.farmer_id), response.email, name, city, country);
       }
 
       // Register farmer location for weather alerts (non-blocking)
@@ -398,6 +404,9 @@ export default function LoginSignupScreen({ onComplete }: LoginSignupScreenProps
             <OtpStep
               email={signupEmail}
               gpsCoords={gpsCoordsRef.current}
+              name={`${firstName.trim()} ${lastName.trim()}`.trim() || undefined}
+              city={city}
+              country={country}
               onVerified={() => {
                 setShowOtp(false);
                 onComplete('signup');

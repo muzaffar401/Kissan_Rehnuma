@@ -12,7 +12,8 @@
     "success": "Success",
     "retry": "Retry",
     "tryAgain": "Try Again",
-    "goBack": "Go Back"
+    "goBack": "Go Back",
+    "ok": "OK"
   },
   "splash": {
     "appName": "Kissan Rehnuma",
@@ -223,6 +224,14 @@
     "contactExperts": "Contact Experts",
     "heroDescription": "For any issues related to crops, animals, or market rates, our experts are ready to assist you.",
     "callNow": "Call Now",
+    "heroBadge": "HELPLINE SUPPORT",
+    "whyUse": "Why use our helpline?",
+    "featHours": "8 AM – 6 PM",
+    "featHoursDesc": "Available every day during working hours",
+    "featFree": "100% Free",
+    "featFreeDesc": "No charges for calling or consulting experts",
+    "featWhatsapp": "WhatsApp Support",
+    "featWhatsappDesc": "Missed our call? Send a message anytime",
     "contactCategories": "Contact Categories",
     "agriculturalExperts": "Agricultural Experts",
     "agriculturalDesc": "Advice on crop diseases, fertilizers, and seeds",
@@ -270,9 +279,27 @@
     "darkModeSubtitle": "Optimize for low light",
     "helpSupport": "Help & Support",
     "helpSubtitle": "FAQs and Helpline",
+    "faqs": "FAQs",
+    "faqsSubtitle": "Common questions and answers",
     "about": "About Kissan Rehnuma",
     "aboutSubtitle": "Version 2.1.0 • Privacy Policy",
-    "logout": "Logout"
+    "aboutDescription": "Kissan Rehnuma is an AI-powered farming assistant that helps Pakistani farmers diagnose crop and animal diseases, get weather alerts, check market rates, and connect with agricultural experts.",
+    "aboutDevelopedBy": "Developed for the farmers of Pakistan",
+    "logout": "Logout",
+    "guestName": "Guest User"
+  },
+  "editProfile": {
+    "title": "Edit Profile",
+    "name": "Full Name",
+    "city": "City",
+    "country": "Country",
+    "save": "Save Changes",
+    "cancel": "Cancel",
+    "changePhoto": "Change Photo",
+    "removePhoto": "Remove Photo"
+  },
+  "faq": {
+    "title": "FAQs"
   },
   "crops": {
     "wheat": "Wheat", "riceBasmatiSuperNew": "Rice Basmati Super (New)", "riceBasmatiSuperOld": "Rice Basmati Super (Old)",

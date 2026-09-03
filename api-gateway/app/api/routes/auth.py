@@ -141,6 +141,28 @@ async def proxy_refresh_token(request: Request):
 
 
 # =========================================================
+# GET /api/v1/auth/profile  (protected — requires Bearer JWT)
+# =========================================================
+
+@router.get("/profile", summary="Get authenticated farmer's profile")
+@limiter.limit(RATE_LIMIT_DEFAULT)
+async def proxy_get_profile(request: Request):
+    """Proxy to user-auth-service GET /api/v1/auth/profile"""
+    return await _proxy_json(request, _get_target_url("/api/v1/auth/profile"))
+
+
+# =========================================================
+# PUT /api/v1/auth/profile  (protected — requires Bearer JWT)
+# =========================================================
+
+@router.put("/profile", summary="Update authenticated farmer's profile")
+@limiter.limit(RATE_LIMIT_DEFAULT)
+async def proxy_update_profile(request: Request):
+    """Proxy to user-auth-service PUT /api/v1/auth/profile"""
+    return await _proxy_json(request, _get_target_url("/api/v1/auth/profile"))
+
+
+# =========================================================
 # GET /api/v1/auth/health  (public)
 # =========================================================
 

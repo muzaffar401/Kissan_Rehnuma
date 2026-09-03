@@ -78,6 +78,7 @@ export const ENDPOINTS = {
     verifyOtp: '/auth/verify-otp',
     resetPassword: '/auth/reset-password',
     refresh: '/auth/refresh',
+    profile: '/auth/profile',
   },
 
   // Crop disease endpoints → crop-disease-service

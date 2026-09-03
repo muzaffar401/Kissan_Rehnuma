@@ -50,3 +50,14 @@ def verify_refresh_token(token: str) -> dict | None:
     except JWTError:
         return None
 
+
+def decode_access_token(token: str) -> dict | None:
+    """Decode an access token JWT. Returns payload dict or None if invalid."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("sub") is None:
+            return None
+        return payload
+    except JWTError:
+        return None
+

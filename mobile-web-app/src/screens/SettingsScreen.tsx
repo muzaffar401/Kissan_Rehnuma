@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
+  Alert,
   Animated,
   Image,
   Modal,
@@ -8,6 +9,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -27,9 +29,16 @@ import { NotoNastaliqUrdu_400Regular } from '@expo-google-fonts/noto-nastaliq-ur
 import { colors } from '../theme/colors';
 import { useTranslation } from 'react-i18next';
 import { tokenStorage } from '../services/tokenStorage';
+import { authService } from '../services/authService';
+import * as ImagePicker from 'expo-image-picker';
 import { LANGUAGE_NAMES } from '../i18n';
 import type { SupportedLanguage } from '../i18n';
 import i18n from '../i18n';
+
+// Storage keys for settings persistence
+const KEYS = {
+  SETTING_DARK_MODE: 'kissan_setting_dark_mode',
+} as const;
 
 const LANGUAGE_OPTIONS: { id: SupportedLanguage; nativeName: string }[] = [
   { id: 'en', nativeName: 'English' },
@@ -54,9 +63,8 @@ const BOTTOM_TABS: { key: BottomTab; icon: string; labelKey: string }[] = [
 const SETTINGS_ITEMS = [
   { id: 'account', icon: 'account', titleKey: 'settings.accountInfo', subtitleKey: 'settings.accountSubtitle', type: 'link' as const },
   { id: 'language', icon: 'translate', titleKey: 'settings.language', subtitleKey: 'settings.languageSubtitle', type: 'link' as const, dynamic: true },
-  { id: 'notifications', icon: 'bell', titleKey: 'settings.notifications', subtitleKey: 'settings.notificationsSubtitle', type: 'toggle' as const, defaultOn: true },
   { id: 'darkmode', icon: 'brightness-6', titleKey: 'settings.darkMode', subtitleKey: 'settings.darkModeSubtitle', type: 'toggle' as const, defaultOn: false },
-  { id: 'help', icon: 'help-circle', titleKey: 'settings.helpSupport', subtitleKey: 'settings.helpSubtitle', type: 'link' as const },
+  { id: 'help', icon: 'help-circle', titleKey: 'settings.faqs', subtitleKey: 'settings.faqsSubtitle', type: 'link' as const },
   { id: 'about', icon: 'information', titleKey: 'settings.about', subtitleKey: 'settings.aboutSubtitle', type: 'link' as const },
 ];
 
@@ -89,10 +97,20 @@ export default function SettingsScreen({ onNavigate }: SettingsScreenProps) {
   const { width } = useWindowDimensions();
   const [bottomActive, setBottomActive] = useState<BottomTab>('home');
   const [toggles, setToggles] = useState<Record<string, boolean>>({
-    notifications: true,
     darkmode: false,
   });
   const [showLangPicker, setShowLangPicker] = useState(false);
+  const [userName, setUserName] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  // Edit profile modal state
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editCity, setEditCity] = useState('');
+  const [editCountry, setEditCountry] = useState('');
+  const [editAvatarUri, setEditAvatarUri] = useState<string | null>(null);
+  const [showAbout, setShowAbout] = useState(false);
   const [fontsLoaded] = useFonts({
     PlusJakartaSans_600SemiBold,
     PlusJakartaSans_700Bold,
@@ -102,6 +120,45 @@ export default function SettingsScreen({ onNavigate }: SettingsScreenProps) {
     NotoNastaliqUrdu_400Regular,
   });
 
+  // Load user profile: fetch from DB via API, fallback to localStorage
+  const refreshProfile = useCallback(async () => {
+    // Load settings from localStorage (always local)
+    const [darkOn, avatar] = await Promise.all([
+      tokenStorage.getSetting(KEYS.SETTING_DARK_MODE, false),
+      tokenStorage.getAvatarUri(),
+    ]);
+    setToggles({ darkmode: darkOn });
+    setAvatarUri(avatar);
+
+    // Try to fetch full profile from database
+    try {
+      const profile = await authService.getProfile();
+      const fullName = `${profile.name} ${profile.lastname}`.trim();
+      const location = [profile.city, profile.country].filter(Boolean).join(', ') || null;
+      setUserName(fullName);
+      setUserLocation(location);
+      setUserEmail(profile.email);
+      // Sync to localStorage for offline access
+      await tokenStorage.saveUserInfo(
+        String(profile.id), profile.email, fullName, profile.city, profile.country,
+      );
+    } catch {
+      // API unavailable — use cached localStorage data
+      const [name, location, email] = await Promise.all([
+        tokenStorage.getUserName(),
+        tokenStorage.getUserLocation(),
+        tokenStorage.getUserEmail(),
+      ]);
+      setUserName(name);
+      setUserLocation(location);
+      setUserEmail(email);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshProfile();
+  }, [refreshProfile]);
+
   const isWide = width > 600;
   const contentMaxWidth = isWide ? 672 : width;
 
@@ -109,8 +166,129 @@ export default function SettingsScreen({ onNavigate }: SettingsScreenProps) {
     return <View style={styles.container} />;
   }
 
-  const handleToggle = (id: string) => {
-    setToggles((prev) => ({ ...prev, [id]: !prev[id] }));
+  const handleToggle = async (id: string) => {
+    const newVal = !toggles[id];
+    setToggles((prev) => ({ ...prev, [id]: newVal }));
+    // Persist the toggle to storage
+    const storageKey = id === 'darkmode'
+      ? KEYS.SETTING_DARK_MODE
+      : null;
+    if (storageKey) {
+      await tokenStorage.setSetting(storageKey, newVal);
+    }
+  };
+
+  // ── Convert blob URL to persistent base64 data URI (web only) ──
+  const toDataUri = async (uri: string): Promise<string> => {
+    if (Platform.OS === 'web' && uri.startsWith('blob:')) {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    }
+    return uri; // native file URIs are already persistent
+  };
+
+  // ── Profile image picker ──
+  const handlePickAvatar = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets[0]) {
+        const dataUri = await toDataUri(result.assets[0].uri);
+        setAvatarUri(dataUri);
+        await tokenStorage.setAvatarUri(dataUri);
+      }
+    } catch {
+      Alert.alert(t('common.error'), 'Could not pick image');
+    }
+  };
+
+  // ── Edit Profile modal ──
+  const handleOpenEditProfile = async () => {
+    // Try to load fresh data from DB
+    try {
+      const profile = await authService.getProfile();
+      setEditName(`${profile.name} ${profile.lastname}`.trim());
+      setEditCity(profile.city || '');
+      setEditCountry(profile.country || '');
+    } catch {
+      // Fallback to localStorage
+      const [name, city, country] = await Promise.all([
+        tokenStorage.getUserName(),
+        tokenStorage.getUserCity(),
+        tokenStorage.getUserCountry(),
+      ]);
+      setEditName(name || '');
+      setEditCity(city || '');
+      setEditCountry(country || '');
+    }
+    const avatar = await tokenStorage.getAvatarUri();
+    setEditAvatarUri(avatar);
+    setShowEditProfile(true);
+  };
+
+  const handleEditPickAvatar = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets[0]) {
+        const dataUri = await toDataUri(result.assets[0].uri);
+        setEditAvatarUri(dataUri);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    // Split full name into first + last for the DB
+    const nameParts = editName.trim().split(/\s+/);
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+
+    // Save to database via API
+    try {
+      await authService.updateProfile({
+        name: firstName || undefined,
+        lastname: lastName || undefined,
+        city: editCity.trim() || undefined,
+        country: editCountry.trim() || undefined,
+      });
+    } catch {
+      // API failed — still save locally as fallback
+    }
+
+    // Always sync localStorage
+    await tokenStorage.updateProfile({
+      name: editName.trim() || undefined,
+      city: editCity.trim() || undefined,
+      country: editCountry.trim() || undefined,
+    });
+    if (editAvatarUri) {
+      await tokenStorage.setAvatarUri(editAvatarUri);
+    }
+    setShowEditProfile(false);
+    await refreshProfile();
+  };
+
+  const handleRemoveAvatar = async () => {
+    setEditAvatarUri(null);
+    setAvatarUri(null);
+    // Remove from storage by setting empty string
+    await tokenStorage.setAvatarUri('');
   };
 
   const handleChangeLanguage = async (langId: SupportedLanguage) => {
@@ -147,13 +325,16 @@ export default function SettingsScreen({ onNavigate }: SettingsScreenProps) {
         showsVerticalScrollIndicator={false}
       >
         {/* Profile Section */}
-        <View style={styles.profileSection}>
+        <Pressable style={styles.profileSection} onPress={handleOpenEditProfile}>
           <View style={styles.profileImageContainer}>
-            <Image
-              source={require('../../assets/profile_avatar.jpg')}
-              style={styles.profileImage}
-            />
-            <Pressable style={styles.profileEditBtn}>
+            {avatarUri ? (
+              <Image source={{ uri: avatarUri }} style={styles.profileImage} />
+            ) : (
+              <View style={styles.profileAvatarFallback}>
+                <MaterialCommunityIcons name="account" size={44} color={colors.onPrimaryContainer} />
+              </View>
+            )}
+            <Pressable style={styles.profileEditBtn} onPress={handlePickAvatar}>
               <MaterialCommunityIcons
                 name="pencil"
                 size={16}
@@ -162,17 +343,29 @@ export default function SettingsScreen({ onNavigate }: SettingsScreenProps) {
             </Pressable>
           </View>
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>Ahmad Khan</Text>
-            <View style={styles.profileLocationRow}>
-              <MaterialCommunityIcons
-                name="map-marker"
-                size={18}
-                color={colors.secondary}
-              />
-              <Text style={styles.profileLocation}>Multan, Pakistan</Text>
-            </View>
+            <Text style={styles.profileName}>{userName || t('settings.guestName')}</Text>
+            {userLocation ? (
+              <View style={styles.profileLocationRow}>
+                <MaterialCommunityIcons
+                  name="map-marker"
+                  size={18}
+                  color={colors.secondary}
+                />
+                <Text style={styles.profileLocation}>{userLocation}</Text>
+              </View>
+            ) : userEmail ? (
+              <View style={styles.profileLocationRow}>
+                <MaterialCommunityIcons
+                  name="email"
+                  size={18}
+                  color={colors.secondary}
+                />
+                <Text style={styles.profileLocation}>{userEmail}</Text>
+              </View>
+            ) : null}
+            <Text style={styles.profileEditHint}>{t('editProfile.title')}</Text>
           </View>
-        </View>
+        </Pressable>
 
         {/* Settings List */}
         <View style={styles.settingsList}>
@@ -181,7 +374,17 @@ export default function SettingsScreen({ onNavigate }: SettingsScreenProps) {
               {item.type === 'link' ? (
                 <Pressable
                   style={styles.settingsRow}
-                  onPress={item.id === 'language' ? () => setShowLangPicker(true) : undefined}
+                  onPress={
+                    item.id === 'language'
+                      ? () => setShowLangPicker(true)
+                      : item.id === 'account'
+                        ? handleOpenEditProfile
+                        : item.id === 'help'
+                          ? () => onNavigate?.('faq')
+                          : item.id === 'about'
+                            ? () => setShowAbout(true)
+                            : undefined
+                  }
                 >
                   <View style={styles.settingsRowLeft}>
                     <MaterialCommunityIcons
@@ -328,6 +531,116 @@ export default function SettingsScreen({ onNavigate }: SettingsScreenProps) {
           </View>
         </Pressable>
       </Modal>
+
+      {/* Edit Profile Modal */}
+      <Modal
+        visible={showEditProfile}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowEditProfile(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowEditProfile(false)}
+        >
+          <Pressable style={styles.editProfileContent}>
+            <Text style={styles.modalTitle}>{t('editProfile.title')}</Text>
+
+            {/* Avatar in edit modal */}
+            <View style={styles.editAvatarRow}>
+              <Pressable onPress={handleEditPickAvatar}>
+                {editAvatarUri ? (
+                  <Image source={{ uri: editAvatarUri }} style={styles.editAvatarImage} />
+                ) : (
+                  <View style={styles.editAvatarFallback}>
+                    <MaterialCommunityIcons name="account" size={30} color={colors.onPrimaryContainer} />
+                  </View>
+                )}
+                <View style={styles.editAvatarOverlay}>
+                  <MaterialCommunityIcons name="camera" size={14} color={colors.onPrimary} />
+                </View>
+              </Pressable>
+              <View style={{ flex: 1 }}>
+                <Pressable onPress={handleEditPickAvatar}>
+                  <Text style={styles.editAvatarAction}>{t('editProfile.changePhoto')}</Text>
+                </Pressable>
+                {editAvatarUri ? (
+                  <Pressable onPress={handleRemoveAvatar}>
+                    <Text style={[styles.editAvatarAction, { color: colors.error }]}>
+                      {t('editProfile.removePhoto')}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            </View>
+
+            {/* Name field */}
+            <Text style={styles.editLabel}>{t('editProfile.name')}</Text>
+            <TextInput
+              style={styles.editInput}
+              value={editName}
+              onChangeText={setEditName}
+              placeholder={t('editProfile.name')}
+              placeholderTextColor={colors.onSurfaceVariant}
+            />
+
+            {/* City field */}
+            <Text style={styles.editLabel}>{t('editProfile.city')}</Text>
+            <TextInput
+              style={styles.editInput}
+              value={editCity}
+              onChangeText={setEditCity}
+              placeholder={t('editProfile.city')}
+              placeholderTextColor={colors.onSurfaceVariant}
+            />
+
+            {/* Country field */}
+            <Text style={styles.editLabel}>{t('editProfile.country')}</Text>
+            <TextInput
+              style={styles.editInput}
+              value={editCountry}
+              onChangeText={setEditCountry}
+              placeholder={t('editProfile.country')}
+              placeholderTextColor={colors.onSurfaceVariant}
+            />
+
+            {/* Buttons */}
+            <View style={styles.editButtonRow}>
+              <Pressable
+                style={styles.editCancelBtn}
+                onPress={() => setShowEditProfile(false)}
+              >
+                <Text style={styles.editCancelText}>{t('editProfile.cancel')}</Text>
+              </Pressable>
+              <Pressable style={styles.editSaveBtn} onPress={handleSaveProfile}>
+                <Text style={styles.editSaveText}>{t('editProfile.save')}</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* About Modal */}
+      <Modal visible={showAbout} transparent animationType="fade" onRequestClose={() => setShowAbout(false)}>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowAbout(false)}
+        >
+          <Pressable style={styles.aboutCard} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.aboutLogoCircle}>
+              <MaterialCommunityIcons name="leaf" size={48} color="#fff" />
+            </View>
+            <Text style={styles.aboutAppName}>Kissan Rehnuma</Text>
+            <Text style={styles.aboutVersion}>v2.1.0</Text>
+            <Text style={styles.aboutDesc}>{t('settings.aboutDescription')}</Text>
+            <View style={styles.aboutDivider} />
+            <Text style={styles.aboutDevelopedBy}>{t('settings.aboutDevelopedBy')}</Text>
+            <Pressable style={styles.aboutCloseBtn} onPress={() => setShowAbout(false)}>
+              <Text style={styles.aboutCloseText}>{t('common.ok')}</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -397,6 +710,16 @@ const styles = StyleSheet.create({
     borderWidth: 4,
     borderColor: colors.surface,
   },
+  profileAvatarFallback: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 4,
+    borderColor: colors.surface,
+    backgroundColor: colors.primaryContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   profileEditBtn: {
     position: 'absolute',
     bottom: 0,
@@ -435,6 +758,12 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: colors.onSurfaceVariant,
     lineHeight: 24,
+  },
+  profileEditHint: {
+    fontFamily: 'BeVietnamPro_400Regular',
+    fontSize: 12,
+    color: colors.primary,
+    marginTop: 8,
   },
   // ─── Settings List ───
   settingsList: {
@@ -606,5 +935,176 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.onSurfaceVariant,
     marginTop: 2,
+  },
+  // ─── Edit Profile Modal ───
+  editProfileContent: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 380,
+    gap: 12,
+  },
+  editAvatarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 4,
+  },
+  editAvatarImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 3,
+    borderColor: colors.surface,
+  },
+  editAvatarFallback: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 3,
+    borderColor: colors.surface,
+    backgroundColor: colors.primaryContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editAvatarOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: colors.primary,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.surface,
+  },
+  editAvatarAction: {
+    fontFamily: 'BeVietnamPro_500Medium',
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.primary,
+    paddingVertical: 6,
+  },
+  editLabel: {
+    fontFamily: 'BeVietnamPro_500Medium',
+    fontSize: 13,
+    fontWeight: '500',
+    color: colors.onSurfaceVariant,
+    marginTop: 4,
+  },
+  editInput: {
+    fontFamily: 'BeVietnamPro_400Regular',
+    fontSize: 15,
+    color: colors.onSurface,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: colors.surfaceContainerLowest,
+  },
+  editButtonRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  editCancelBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+  },
+  editCancelText: {
+    fontFamily: 'BeVietnamPro_600SemiBold',
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.onSurfaceVariant,
+  },
+  editSaveBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+  },
+  editSaveText: {
+    fontFamily: 'BeVietnamPro_600SemiBold',
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.onPrimary,
+  },
+  // ─── About Modal ───
+  aboutCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    padding: 28,
+    alignItems: 'center',
+    maxWidth: 360,
+    width: '85%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  aboutLogoCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  aboutAppName: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 22,
+    fontWeight: '700',
+    color: colors.onSurface,
+    marginBottom: 4,
+  },
+  aboutVersion: {
+    fontSize: 13,
+    color: colors.onSurfaceVariant,
+    marginBottom: 16,
+  },
+  aboutDesc: {
+    fontSize: 14,
+    color: colors.onSurfaceVariant,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 16,
+  },
+  aboutDivider: {
+    height: 1,
+    width: '100%',
+    backgroundColor: colors.surfaceContainer,
+    marginBottom: 16,
+  },
+  aboutDevelopedBy: {
+    fontSize: 12,
+    color: colors.primary,
+    fontWeight: '600',
+    fontStyle: 'italic',
+    marginBottom: 20,
+  },
+  aboutCloseBtn: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 32,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  aboutCloseText: {
+    fontFamily: 'BeVietnamPro_600SemiBold',
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.onPrimary,
   },
 });
