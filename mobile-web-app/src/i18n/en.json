@@ -299,7 +299,26 @@
     "removePhoto": "Remove Photo"
   },
   "faq": {
-    "title": "FAQs"
+    "title": "FAQs",
+    "headerTitle": "How can we help?",
+    "headerSubtitle": "Find answers to common questions about Kissan Rehnuma",
+    "q1": "How does crop disease detection work?",
+    "a1": "Go to the Disease screen, select 'Crop', and take a clear photo of the affected leaf or plant. Our AI will analyze the image and provide a diagnosis with treatment recommendations within seconds.",
+    "q2": "How does animal disease detection work?",
+    "a2": "Navigate to the Disease screen, select 'Animal', and photograph the affected area of your livestock. The AI will identify potential diseases and suggest appropriate veterinary guidance.",
+    "q3": "How can I check current market rates?",
+    "a3": "Tap the Market tab from the bottom navigation. You'll see current mandi prices for crops like wheat, rice, maize, sugarcane and more. Use the search bar to find specific items.",
+    "q4": "How do I get weather alerts for my area?",
+    "a4": "Make sure your city is set in your profile. The Weather screen shows real-time forecasts and sends alerts for extreme conditions like heavy rain, heatwaves, or frost that could affect your crops.",
+    "q5": "How does the voice helpline work?",
+    "a5": "Tap the Helpline tab and press 'Call Now'. You'll be connected to our AI-powered voice agent that can answer farming questions in Urdu, Sindhi, or English — completely free.",
+    "q6": "What if the AI diagnosis is not accurate?",
+    "a6": "For best results, take a clear, well-lit photo of just the affected part. If the diagnosis seems wrong, try a closer shot or call our helpline to speak with a human expert.",
+    "q7": "What languages does the app support?",
+    "a7": "Kissan Rehnuma supports English, Urdu, and Sindhi. You can change the language anytime from Settings. The entire app interface, including voice features, works in all three languages.",
+    "q8": "How do I update my profile information?",
+    "a8": "Go to Settings and tap on your profile section at the top. You can update your name, city, country, and profile picture. Changes are saved to your account automatically.",
+    "bottomHelp": "Still have questions? Use the helpline to talk to our experts."
   },
   "crops": {
     "wheat": "Wheat", "riceBasmatiSuperNew": "Rice Basmati Super (New)", "riceBasmatiSuperOld": "Rice Basmati Super (Old)",

@@ -36,9 +36,14 @@ interface FaqScreenProps {
 }
 
 const FAQS = [
-  { id: '1', questionKey: 'helpline.faq1Question', answerKey: 'helpline.faq1Answer' },
-  { id: '2', questionKey: 'helpline.faq2Question', answerKey: 'helpline.faq2Answer' },
-  { id: '3', questionKey: 'helpline.faq3Question', answerKey: 'helpline.faq3Answer' },
+  { id: '1', questionKey: 'faq.q1', answerKey: 'faq.a1', icon: 'leaf' as const, color: '#4a6b57' },
+  { id: '2', questionKey: 'faq.q2', answerKey: 'faq.a2', icon: 'paw-print' as const, color: '#9a4e40' },
+  { id: '3', questionKey: 'faq.q3', answerKey: 'faq.a3', icon: 'tag' as const, color: '#c68a00' },
+  { id: '4', questionKey: 'faq.q4', answerKey: 'faq.a4', icon: 'weather-cloudy' as const, color: '#3b7dd8' },
+  { id: '5', questionKey: 'faq.q5', answerKey: 'faq.a5', icon: 'phone' as const, color: '#4a6b57' },
+  { id: '6', questionKey: 'faq.q6', answerKey: 'faq.a6', icon: 'image-filter-center-focus' as const, color: '#9a4e40' },
+  { id: '7', questionKey: 'faq.q7', answerKey: 'faq.a7', icon: 'translate' as const, color: '#3b7dd8' },
+  { id: '8', questionKey: 'faq.q8', answerKey: 'faq.a8', icon: 'account-edit' as const, color: '#c68a00' },
 ];
 
 export default function FaqScreen({ onNavigate }: FaqScreenProps) {
@@ -92,42 +97,62 @@ export default function FaqScreen({ onNavigate }: FaqScreenProps) {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* FAQ Section */}
-        <View style={styles.faqSection}>
-          <Text style={styles.faqSectionTitle}>{t('helpline.commonQuestions')}</Text>
+        {/* Header */}
+        <View style={styles.headerCard}>
+          <View style={styles.headerIconCircle}>
+            <MaterialCommunityIcons name="frequently-asked-questions" size={32} color="#fff" />
+          </View>
+          <Text style={styles.headerTitle}>{t('faq.headerTitle')}</Text>
+          <Text style={styles.headerSubtitle}>{t('faq.headerSubtitle')}</Text>
+        </View>
+
+        {/* FAQ Items */}
+        <View style={styles.faqList}>
           {FAQS.map((faq) => {
             const isOpen = openFaq === faq.id;
             return (
-              <View key={faq.id} style={styles.faqItem}>
+              <View key={faq.id} style={[styles.faqItem, isOpen && styles.faqItemOpen]}>
                 <Pressable
                   style={styles.faqHeader}
                   onPress={() => toggleFaq(faq.id)}
                 >
-                  <Text style={styles.faqQuestion}>{t(faq.questionKey)}</Text>
+                  <View style={[styles.faqIconCircle, { backgroundColor: `${faq.color}18` }]}>
+                    <MaterialCommunityIcons
+                      name={faq.icon as any}
+                      size={18}
+                      color={faq.color}
+                    />
+                  </View>
+                  <Text style={[styles.faqQuestion, isOpen && styles.faqQuestionOpen]}>
+                    {t(faq.questionKey)}
+                  </Text>
                   <Animated.View
                     style={{
-                      transform: [
-                        {
-                          rotate: isOpen ? '180deg' : '0deg',
-                        },
-                      ],
+                      transform: [{ rotate: isOpen ? '180deg' : '0deg' }],
                     }}
                   >
                     <MaterialCommunityIcons
                       name="chevron-down"
-                      size={24}
-                      color={colors.onSurface}
+                      size={22}
+                      color={isOpen ? colors.primary : colors.onSurfaceVariant}
                     />
                   </Animated.View>
                 </Pressable>
                 {isOpen && (
                   <View style={styles.faqAnswer}>
+                    <View style={styles.faqAnswerDivider} />
                     <Text style={styles.faqAnswerText}>{t(faq.answerKey)}</Text>
                   </View>
                 )}
               </View>
             );
           })}
+        </View>
+
+        {/* Bottom help text */}
+        <View style={styles.bottomHelp}>
+          <MaterialCommunityIcons name="information-outline" size={18} color={colors.onSurfaceVariant} />
+          <Text style={styles.bottomHelpText}>{t('faq.bottomHelp')}</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -173,59 +198,116 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingVertical: 16,
+    paddingVertical: 20,
     paddingHorizontal: 20,
     alignSelf: 'center' as const,
     width: '100%',
+    gap: 20,
   },
-  // ─── FAQ Section ───
-  faqSection: {
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: 12,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: colors.surfaceContainerHigh,
+  // ─── Header Card ───
+  headerCard: {
+    alignItems: 'center',
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+    backgroundColor: colors.primaryContainer,
+    borderRadius: 16,
     gap: 8,
   },
-  faqSectionTitle: {
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    fontSize: 24,
-    fontWeight: '600',
-    color: colors.onBackground,
-    marginBottom: 12,
+  headerIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  headerTitle: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.onPrimaryContainer,
+  },
+  headerSubtitle: {
+    fontFamily: 'BeVietnamPro_400Regular',
+    fontSize: 13,
+    fontWeight: '400',
+    color: colors.onPrimaryContainer,
+    opacity: 0.8,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  // ─── FAQ List ───
+  faqList: {
+    gap: 8,
   },
   faqItem: {
-    backgroundColor: colors.surface,
-    borderRadius: 8,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.surfaceVariant,
+    borderColor: colors.surfaceContainerHigh,
     overflow: 'hidden',
+  },
+  faqItemOpen: {
+    borderColor: colors.primaryContainer,
+    borderWidth: 1.5,
   },
   faqHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    padding: 14,
+    gap: 10,
+  },
+  faqIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
   faqQuestion: {
     fontFamily: 'BeVietnamPro_600SemiBold',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: colors.onSurface,
-    lineHeight: 20,
-    letterSpacing: 0.14,
+    lineHeight: 19,
     flex: 1,
-    paddingRight: 12,
+    paddingRight: 8,
+  },
+  faqQuestionOpen: {
+    color: colors.primary,
   },
   faqAnswer: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingHorizontal: 14,
+    paddingBottom: 14,
+  },
+  faqAnswerDivider: {
+    height: 1,
+    backgroundColor: colors.surfaceContainerHigh,
+    marginBottom: 12,
+    marginLeft: 42,
   },
   faqAnswerText: {
     fontFamily: 'BeVietnamPro_400Regular',
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '400',
     color: colors.onSurfaceVariant,
-    lineHeight: 24,
+    lineHeight: 21,
+    marginLeft: 42,
+  },
+  // ─── Bottom Help ───
+  bottomHelp: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 8,
+  },
+  bottomHelpText: {
+    fontFamily: 'BeVietnamPro_400Regular',
+    fontSize: 12,
+    color: colors.onSurfaceVariant,
+    lineHeight: 18,
   },
 });
