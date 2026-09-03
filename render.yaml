@@ -49,32 +49,17 @@ services:
         sync: false
       - key: CORS_ORIGINS
         sync: false
-      # Service URLs — auto-populated from deployed services
+      # Service URLs — fill after first deploy with each service's .onrender.com URL
       - key: CROP_DISEASE_SERVICE_URL
-        fromService:
-          name: kissan-crop-disease
-          type: web
-          property: url
+        sync: false
       - key: USER_AUTH_SERVICE_URL
-        fromService:
-          name: kissan-user-auth
-          type: web
-          property: url
+        sync: false
       - key: ANIMAL_DISEASE_SERVICE_URL
-        fromService:
-          name: kissan-animal-disease
-          type: web
-          property: url
+        sync: false
       - key: WEATHER_ALERT_SERVICE_URL
-        fromService:
-          name: kissan-weather-alert
-          type: web
-          property: url
+        sync: false
       - key: MARKET_RATE_SERVICE_URL
-        fromService:
-          name: kissan-market-rate
-          type: web
-          property: url
+        sync: false
 
   # ──────────────────────────────────────────────────────────
   # User Auth Service — farmer registration, login, OTP,
