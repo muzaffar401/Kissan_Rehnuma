@@ -37,6 +37,7 @@ import {
 } from 'livekit-client';
 import type { RemoteTrack, TrackPublication, Participant } from 'livekit-client';
 import { colors } from '../theme/colors';
+import { useTranslation } from 'react-i18next';
 import { tokenStorage } from '../services/tokenStorage';
 import { fetchVoiceToken, generateRoomName } from '../services/helplineService';
 import { LIVEKIT_URL } from '../services/config';
@@ -56,6 +57,7 @@ interface VoiceCallScreenProps {
 // ---------------------------------------------------------------------------
 
 export default function VoiceCallScreen({ onNavigate }: VoiceCallScreenProps) {
+  const { t } = useTranslation();
   const [fontsLoaded] = useFonts({
     BeVietnamPro_400Regular,
     BeVietnamPro_500Medium,
@@ -327,15 +329,15 @@ export default function VoiceCallScreen({ onNavigate }: VoiceCallScreenProps) {
   const getStatusText = () => {
     switch (callState) {
       case 'idle':
-        return 'Tap to start voice consultation';
+        return t('voiceCall.tapToStart');
       case 'requesting-token':
-        return 'Connecting to server...';
+        return t('voiceCall.connectingServer');
       case 'connecting':
-        return 'Joining call room...';
+        return t('voiceCall.joiningRoom');
       case 'connected':
-        return agentSpeaking ? 'Agent is speaking' : 'Listening...';
+        return agentSpeaking ? t('voiceCall.agentSpeaking') : t('voiceCall.listening');
       case 'error':
-        return errorMsg || 'Call failed';
+        return errorMsg || t('voiceCall.callFailed');
     }
   };
 
@@ -348,7 +350,7 @@ export default function VoiceCallScreen({ onNavigate }: VoiceCallScreenProps) {
         <Pressable style={styles.iconBtn} onPress={endCall}>
           <MaterialCommunityIcons name="chevron-down" size={28} color={colors.onPrimary} />
         </Pressable>
-        <Text style={styles.topBarTitle}>Voice Consultation</Text>
+        <Text style={styles.topBarTitle}>{t('voiceCall.title')}</Text>
         <View style={styles.iconBtn} />
       </View>
 
@@ -390,9 +392,9 @@ export default function VoiceCallScreen({ onNavigate }: VoiceCallScreenProps) {
 
         {/* Agent info */}
         <View style={styles.infoContainer}>
-          <Text style={styles.agentName}>Kissan Rehnuma Agent</Text>
+          <Text style={styles.agentName}>{t('voiceCall.agentName')}</Text>
           {userName ? (
-            <Text style={styles.callingAsText}>Calling as {userName}</Text>
+            <Text style={styles.callingAsText}>{t('voiceCall.callingAs', { name: userName })}</Text>
           ) : null}
           <View style={styles.statusRow}>
             {isConnecting && (
@@ -439,7 +441,7 @@ export default function VoiceCallScreen({ onNavigate }: VoiceCallScreenProps) {
                   size={28}
                   color={isMuted ? colors.primary : colors.onSurfaceVariant}
                 />
-                <Text style={styles.controlLabel}>{isMuted ? 'Unmute' : 'Mute'}</Text>
+                <Text style={styles.controlLabel}>{isMuted ? t('voiceCall.unmute') : t('voiceCall.mute')}</Text>
               </Pressable>
 
               <Pressable
@@ -451,14 +453,14 @@ export default function VoiceCallScreen({ onNavigate }: VoiceCallScreenProps) {
                   size={28}
                   color={isSpeakerOn ? colors.primary : colors.onSurfaceVariant}
                 />
-                <Text style={styles.controlLabel}>Speaker</Text>
+                <Text style={styles.controlLabel}>{t('voiceCall.speaker')}</Text>
               </Pressable>
             </View>
 
             {/* End call button */}
             <Pressable style={styles.endCallBtn} onPress={endCall}>
               <MaterialCommunityIcons name="phone-hangup" size={32} color={colors.onPrimary} />
-              <Text style={styles.endCallText}>End Call</Text>
+              <Text style={styles.endCallText}>{t('voiceCall.endCall')}</Text>
             </Pressable>
           </>
         ) : (
@@ -474,11 +476,11 @@ export default function VoiceCallScreen({ onNavigate }: VoiceCallScreenProps) {
                 <MaterialCommunityIcons name="phone" size={28} color={colors.onPrimary} />
               )}
               <Text style={styles.startCallText}>
-                {callState === 'error' ? 'Try Again' : 'Call Now'}
+                {callState === 'error' ? t('voiceCall.tryAgain') : t('voiceCall.callNow')}
               </Text>
             </Pressable>
             {callState === 'idle' && (
-              <Text style={styles.hintText}>Free AI consultation for crops, animals & markets</Text>
+              <Text style={styles.hintText}>{t('voiceCall.hintText')}</Text>
             )}
           </>
         )}

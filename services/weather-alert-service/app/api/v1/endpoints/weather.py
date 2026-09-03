@@ -28,6 +28,7 @@ router = APIRouter()
 # 60 min TTL + ±10% jitter — farming advice changes slowly, no need to hit LLM often.
 # Jitter prevents thundering-herd: all entries expiring at the same instant.
 _ADVISORY_BASE_TTL = 60 * 60  # 60 minutes
+_ADVISORY_CACHE_VERSION = "v3"  # bump when prompt/logic changes to invalidate stale entries
 _advisory_cache: TTLCache = TTLCache(
     maxsize=100,
     ttl=_ADVISORY_BASE_TTL + random.randint(-300, 300),  # ±5 min jitter
@@ -149,14 +150,20 @@ def get_weather_forecast(farmer_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/weather/advisory/{farmer_id}", response_model=AdvisoryResponse)
-def get_farmer_advisory(farmer_id: int, db: Session = Depends(get_db)):
+def get_farmer_advisory(
+    farmer_id: int,
+    lang: str = "ur",
+    db: Session = Depends(get_db),
+):
     """Generate LLM-based farming advice from current weather + forecast.
     
     Results are cached in-memory for WEATHER_CACHE_MINUTES to avoid
     hitting the LLM API on every request.
+    Cache key includes language so each language is cached separately.
     """
-    # Check cache first
-    cached = _advisory_cache.get(farmer_id)
+    # Check cache first (keyed by farmer_id + language + version)
+    cache_key = f"{farmer_id}:{lang}:{_ADVISORY_CACHE_VERSION}"
+    cached = _advisory_cache.get(cache_key)
     if cached is not None:
         return cached
 
@@ -176,7 +183,7 @@ def get_farmer_advisory(farmer_id: int, db: Session = Depends(get_db)):
             status_code=502, detail=f"Weather provider unavailable: {exc}"
         )
 
-    advice = llm_advisory.generate_general_advisory(current, forecast)
+    advice = llm_advisory.generate_general_advisory(current, forecast, lang=lang)
     if advice:
         response = AdvisoryResponse(
             farmer_id=farmer_id, advice=advice, source="llm"
@@ -192,5 +199,5 @@ def get_farmer_advisory(farmer_id: int, db: Session = Depends(get_db)):
         )
 
     # Cache the response
-    _advisory_cache[farmer_id] = response
+    _advisory_cache[cache_key] = response
     return response

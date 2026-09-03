@@ -4,12 +4,14 @@ import { useFonts, PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakar
 import { BeVietnamPro_400Regular } from '@expo-google-fonts/be-vietnam-pro';
 import { NotoNastaliqUrdu_400Regular } from '@expo-google-fonts/noto-nastaliq-urdu';
 import { colors } from '../theme/colors';
+import { useTranslation } from 'react-i18next';
 
 interface SplashScreenProps {
   onComplete: () => void;
 }
 
 export default function SplashScreen({ onComplete }: SplashScreenProps) {
+  const { t } = useTranslation();
   const scaleAnim = useRef(new Animated.Value(0.6)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const textOpacity = useRef(new Animated.Value(0)).current;
@@ -127,8 +129,8 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
 
         {/* App Name */}
         <Animated.View style={{ opacity: textOpacity }}>
-          <Text style={styles.appName}>Kissan Rehnuma</Text>
-          <Text style={styles.appNameUrdu}>کسان رہنما</Text>
+          <Text style={styles.appName}>{t('splash.appName')}</Text>
+          <Text style={styles.appNameUrdu}>{t('splash.appNameUrdu')}</Text>
         </Animated.View>
       </Animated.View>
 

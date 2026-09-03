@@ -87,8 +87,8 @@ export const weatherService = {
   },
 
   /** Get LLM-generated farming advice based on current weather + forecast */
-  async getAdvisory(farmerId: number): Promise<AdvisoryResponse> {
-    return api.get<AdvisoryResponse>(ENDPOINTS.weather.advisory(farmerId));
+  async getAdvisory(farmerId: number, lang: string = 'ur'): Promise<AdvisoryResponse> {
+    return api.get<AdvisoryResponse>(`${ENDPOINTS.weather.advisory(farmerId)}?lang=${lang}`);
   },
 
   /** Get sent alert history for a farmer */

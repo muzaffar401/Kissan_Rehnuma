@@ -40,7 +40,8 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Allow Kissan Rehnuma to access your location for weather alerts and crop recommendations."
         }
-      ]
+      ],
+      "expo-localization"
     ],
     "extra": {
       "eas": {

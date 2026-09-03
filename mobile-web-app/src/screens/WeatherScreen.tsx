@@ -24,6 +24,8 @@ import {
   BeVietnamPro_600SemiBold,
 } from '@expo-google-fonts/be-vietnam-pro';
 import { colors } from '../theme/colors';
+import { useTranslation } from 'react-i18next';
+import i18n from '../i18n';
 import { weatherService, CurrentWeatherResponse, ForecastEntry, AlertHistoryItem, AdvisoryResponse } from '../services/weatherService';
 import { tokenStorage } from '../services/tokenStorage';
 
@@ -33,12 +35,12 @@ interface WeatherScreenProps {
   onNavigate?: (screen: string) => void;
 }
 
-const bottomTabs: { key: BottomTab; icon: string; label: string }[] = [
-  { key: 'home', icon: 'home', label: 'Home' },
-  { key: 'disease', icon: 'leaf', label: 'Disease' },
-  { key: 'weather', icon: 'weather-sunny', label: 'Weather' },
-  { key: 'market', icon: 'tag', label: 'Market' },
-  { key: 'helpline', icon: 'phone', label: 'Helpline' },
+const BOTTOM_TABS: { key: BottomTab; icon: string; labelKey: string }[] = [
+  { key: 'home', icon: 'home', labelKey: 'common.nav.home' },
+  { key: 'disease', icon: 'leaf', labelKey: 'common.nav.disease' },
+  { key: 'weather', icon: 'weather-sunny', labelKey: 'common.nav.weather' },
+  { key: 'market', icon: 'tag', labelKey: 'common.nav.market' },
+  { key: 'helpline', icon: 'phone', labelKey: 'common.nav.helpline' },
 ];
 
 // Map wind + rain conditions to a weather icon name
@@ -50,25 +52,55 @@ function getWeatherIcon(rain_mm: number, wind_kmh: number, temp: number): string
   return 'weather-partly-cloudy';
 }
 
-function getWeatherCondition(rain_mm: number, wind_kmh: number, temp: number): string {
-  if (rain_mm > 5) return 'Heavy Rain';
-  if (rain_mm > 1) return 'Light Rain';
-  if (wind_kmh > 30) return 'Windy';
-  if (temp > 35) return 'Hot & Sunny';
-  if (temp > 28) return 'Sunny';
-  return 'Partly Cloudy';
+function getWeatherConditionKey(rain_mm: number, wind_kmh: number, temp: number): string {
+  if (rain_mm > 5) return 'weather.heavyRain';
+  if (rain_mm > 1) return 'weather.lightRain';
+  if (wind_kmh > 30) return 'weather.windy';
+  if (temp > 35) return 'weather.hotSunny';
+  if (temp > 28) return 'weather.sunny';
+  return 'weather.partlyCloudy';
 }
 
-// Get day label from ISO date string
-function getDayLabel(isoTime: string, index: number): string {
-  if (index === 0) return 'Today';
+// Map English short day names to i18n keys
+const _DAY_KEYS: Record<string, string> = {
+  Sun: 'weekdays.sun', Mon: 'weekdays.mon', Tue: 'weekdays.tue',
+  Wed: 'weekdays.wed', Thu: 'weekdays.thu', Fri: 'weekdays.fri',
+  Sat: 'weekdays.sat',
+};
+
+// Get day label i18n key from ISO date string
+function getDayLabelKey(isoTime: string, index: number): string {
+  if (index === 0) return 'weather.today';
   const date = new Date(isoTime);
-  return date.toLocaleDateString('en-US', { weekday: 'short' });
+  const en = date.toLocaleDateString('en-US', { weekday: 'short' });
+  return _DAY_KEYS[en] || en;
+}
+
+// Group hourly forecast entries into daily summaries
+function groupForecastByDay(entries: ForecastEntry[]): ForecastEntry[] {
+  const dayMap = new Map<string, ForecastEntry[]>();
+  for (const entry of entries) {
+    const dateKey = entry.time.split('T')[0]; // "2026-09-04"
+    if (!dayMap.has(dateKey)) dayMap.set(dateKey, []);
+    dayMap.get(dateKey)!.push(entry);
+  }
+  const daily: ForecastEntry[] = [];
+  for (const [, group] of dayMap) {
+    daily.push({
+      time: group[0].time,
+      temp_min: Math.min(...group.map(e => e.temp_min)),
+      temp_max: Math.max(...group.map(e => e.temp_max)),
+      rain_mm: group.reduce((sum, e) => sum + e.rain_mm, 0),
+      wind_kmh: Math.max(...group.map(e => e.wind_kmh)),
+    });
+  }
+  return daily;
 }
 
 // Derive farmer advice from current weather — REMOVED, now LLM-based via backend
 
 export default function WeatherScreen({ onNavigate }: WeatherScreenProps) {
+  const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const [bottomActive, setBottomActive] = useState<BottomTab>('weather');
 
@@ -101,15 +133,15 @@ export default function WeatherScreen({ onNavigate }: WeatherScreenProps) {
         weatherService.getCurrentWeather(farmerId),
         weatherService.getForecast(farmerId),
         weatherService.getAlertHistory(farmerId),
-        weatherService.getAdvisory(farmerId).catch(() => null),
+        weatherService.getAdvisory(farmerId, i18n.language).catch(() => null),
       ]);
 
       setCurrent(currentData);
-      setForecast(forecastData.forecast.slice(0, 5));
+      setForecast(groupForecastByDay(forecastData.forecast).slice(0, 7));
       setAlerts(alertData.alerts.slice(0, 3));
       if (advisoryData) setAdvice(advisoryData);
     } catch (e: any) {
-      setError(e?.detail || 'Could not load weather data. Please try again.');
+      setError(e?.detail || t('weather.couldNotLoad'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -131,7 +163,7 @@ export default function WeatherScreen({ onNavigate }: WeatherScreenProps) {
           <Pressable style={styles.appBarBackBtn} onPress={() => onNavigate?.('home')}>
             <MaterialCommunityIcons name="arrow-left" size={24} color={colors.primary} />
           </Pressable>
-          <Text style={styles.appBarTitle}>Kissan Rehnuma</Text>
+          <Text style={styles.appBarTitle}>{t('common.appName')}</Text>
         </View>
         <Pressable style={styles.appBarProfileBtn} onPress={() => fetchData(true)}>
           <MaterialCommunityIcons name="refresh" size={24} color={colors.onSurfaceVariant} />
@@ -148,7 +180,7 @@ export default function WeatherScreen({ onNavigate }: WeatherScreenProps) {
         {loading && (
           <View style={styles.centered}>
             <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>Loading weather data...</Text>
+            <Text style={styles.loadingText}>{t('weather.loadingData')}</Text>
           </View>
         )}
 
@@ -158,7 +190,7 @@ export default function WeatherScreen({ onNavigate }: WeatherScreenProps) {
             <MaterialCommunityIcons name="weather-cloudy-alert" size={48} color={colors.outline} />
             <Text style={styles.errorText}>{error}</Text>
             <Pressable style={styles.retryButton} onPress={() => fetchData()}>
-              <Text style={styles.retryText}>Retry</Text>
+              <Text style={styles.retryText}>{t('weather.retry')}</Text>
             </Pressable>
           </View>
         ) : null}
@@ -175,11 +207,11 @@ export default function WeatherScreen({ onNavigate }: WeatherScreenProps) {
                   {current.latitude.toFixed(2)}°N, {current.longitude.toFixed(2)}°E
                 </Text>
                 <Text style={styles.headerCityWeather}>
-                  {getWeatherCondition(current.rain_mm, current.wind_speed_kmh, current.temperature)}
+                  {t(getWeatherConditionKey(current.rain_mm, current.wind_speed_kmh, current.temperature))}
                   {' \u2022 '}{Math.round(current.temperature)}{'\u00B0'}C
                 </Text>
                 <Text style={styles.headerSubInfo}>
-                  Humidity {current.humidity}% · Wind {Math.round(current.wind_speed_kmh)} km/h
+                  {t('weather.humidityWind', { humidity: current.humidity, wind: Math.round(current.wind_speed_kmh) })}
                 </Text>
               </View>
             </View>
@@ -187,7 +219,7 @@ export default function WeatherScreen({ onNavigate }: WeatherScreenProps) {
             {/* Alert History */}
             {alerts.length > 0 && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Weather Alerts</Text>
+                <Text style={styles.sectionTitle}>{t('weather.weatherAlerts')}</Text>
                 {alerts.map((alert, idx) => (
                   <View key={idx} style={styles.alertCard}>
                     <View style={styles.alertStripe} />
@@ -213,7 +245,7 @@ export default function WeatherScreen({ onNavigate }: WeatherScreenProps) {
               <View style={styles.section}>
                 <View style={styles.adviceSectionHeader}>
                   <MaterialCommunityIcons name="lightbulb-on" size={22} color={colors.primary} />
-                  <Text style={styles.adviceSectionTitle}>Farmer's Advice</Text>
+                  <Text style={styles.adviceSectionTitle}>{t('weather.farmersAdvice')}</Text>
                   {advice.source === 'llm' && (
                     <View style={styles.llmBadge}>
                       <Text style={styles.llmBadgeText}>AI</Text>
@@ -235,7 +267,7 @@ export default function WeatherScreen({ onNavigate }: WeatherScreenProps) {
             {/* Forecast */}
             {forecast.length > 0 && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Forecast</Text>
+                <Text style={styles.sectionTitle}>{t('weather.forecast')}</Text>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -249,7 +281,7 @@ export default function WeatherScreen({ onNavigate }: WeatherScreenProps) {
                       style={[styles.forecastCard, index === 0 && styles.forecastCardToday]}
                     >
                       <Text style={[styles.forecastDay, index === 0 && styles.forecastDayToday]}>
-                        {getDayLabel(entry.time, index)}
+                        {t(getDayLabelKey(entry.time, index))}
                       </Text>
                       <MaterialCommunityIcons
                         name={getWeatherIcon(entry.rain_mm, entry.wind_kmh, entry.temp_max) as any}
@@ -269,7 +301,7 @@ export default function WeatherScreen({ onNavigate }: WeatherScreenProps) {
 
       {/* Bottom Navigation */}
       <View style={styles.bottomNav}>
-        {bottomTabs.map((tab) => {
+        {BOTTOM_TABS.map((tab) => {
           const isActive = bottomActive === tab.key;
           return (
             <Pressable
@@ -286,7 +318,7 @@ export default function WeatherScreen({ onNavigate }: WeatherScreenProps) {
                 color={isActive ? colors.onPrimaryContainer : colors.onSurfaceVariant}
               />
               <Text style={[styles.navLabel, isActive ? styles.navLabelActive : styles.navLabelInactive]}>
-                {tab.label}
+                {t(tab.labelKey)}
               </Text>
             </Pressable>
           );

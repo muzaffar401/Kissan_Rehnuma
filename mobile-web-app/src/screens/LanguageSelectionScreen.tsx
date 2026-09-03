@@ -5,6 +5,8 @@ import { BeVietnamPro_400Regular, BeVietnamPro_500Medium, BeVietnamPro_600SemiBo
 import { NotoNastaliqUrdu_400Regular } from '@expo-google-fonts/noto-nastaliq-urdu';
 import { colors } from '../theme/colors';
 import { tokenStorage } from '../services/tokenStorage';
+import { useTranslation } from 'react-i18next';
+import i18n from '../i18n';
 
 interface LanguageSelectionScreenProps {
   onComplete: (language: string) => void;
@@ -12,21 +14,29 @@ interface LanguageSelectionScreenProps {
 
 const languages = [
   {
+    id: 'en',
+    nativeName: 'English',
+    englishName: 'English',
+    label: 'English',
+  },
+  {
     id: 'ur',
     nativeName: 'اردو',
     englishName: 'Urdu',
     label: 'Urdu',
+    isRtl: true,
   },
   {
-    id: 'en',
-    nativeName: 'English',
-    englishName: 'English',
-    label: 'انگریزی',
-    isLabelRtl: true,
+    id: 'sd',
+    nativeName: 'سنڌي',
+    englishName: 'Sindhi',
+    label: 'Sindhi',
+    isRtl: true,
   },
 ];
 
 export default function LanguageSelectionScreen({ onComplete }: LanguageSelectionScreenProps) {
+  const { t } = useTranslation();
   const [selected, setSelected] = useState<string | null>(null);
   const [fontsLoaded] = useFonts({
     PlusJakartaSans_600SemiBold,
@@ -87,8 +97,10 @@ export default function LanguageSelectionScreen({ onComplete }: LanguageSelectio
     setSelected(id);
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (selected) {
+      // Apply language to i18next immediately
+      await i18n.changeLanguage(selected);
       tokenStorage.setOnboardingComplete(selected); // persist onboarding + language
       onComplete(selected);
     }
@@ -103,8 +115,8 @@ export default function LanguageSelectionScreen({ onComplete }: LanguageSelectio
       <View style={styles.content}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Select Language</Text>
-          <Text style={styles.subtitle}>Please select your preferred language</Text>
+          <Text style={styles.title}>{t('language.title')}</Text>
+          <Text style={styles.subtitle}>{t('language.subtitle')}</Text>
         </View>
 
         {/* Language Cards */}
@@ -135,10 +147,7 @@ export default function LanguageSelectionScreen({ onComplete }: LanguageSelectio
                       {lang.nativeName}
                     </Text>
                     <Text
-                      style={[
-                        styles.englishName,
-                        lang.isLabelRtl && { textAlign: 'left' as const },
-                      ]}
+                      style={styles.englishName}
                     >
                       {lang.label}
                     </Text>
@@ -172,7 +181,7 @@ export default function LanguageSelectionScreen({ onComplete }: LanguageSelectio
                 !selected && styles.continueButtonTextDisabled,
               ]}
             >
-              Continue
+              {t('language.continue')}
             </Text>
           </Pressable>
         </View>

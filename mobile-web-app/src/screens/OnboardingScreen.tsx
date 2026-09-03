@@ -4,37 +4,38 @@ import CrossPager, { CrossPagerRef } from '../components/PagerView';
 import { useFonts, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans';
 import { BeVietnamPro_400Regular, BeVietnamPro_600SemiBold } from '@expo-google-fonts/be-vietnam-pro';
 import { colors } from '../theme/colors';
+import { useTranslation } from 'react-i18next';
 import { tokenStorage } from '../services/tokenStorage';
 
 const slides = [
   {
     id: 1,
-    title: 'Crop Disease Detection',
-    description: 'Take a photo of your crop to instantly identify diseases and get expert advice.',
+    titleKey: 'onboarding.slide1Title',
+    descKey: 'onboarding.slide1Desc',
     image: require('../../assets/onboarding_crop.jpg'),
   },
   {
     id: 2,
-    title: 'Animal Disease Detection',
-    description: 'Scan your livestock to identify diseases early and get treatment guidance.',
+    titleKey: 'onboarding.slide2Title',
+    descKey: 'onboarding.slide2Desc',
     image: require('../../assets/onboarding_animal.png'),
   },
   {
     id: 3,
-    title: 'Real-time Market Rates',
-    description: 'Stay updated with the latest prices from markets across Pakistan.',
+    titleKey: 'onboarding.slide3Title',
+    descKey: 'onboarding.slide3Desc',
     image: require('../../assets/onboarding_market.jpg'),
   },
   {
     id: 4,
-    title: 'Accurate Weather Alerts',
-    description: 'Get localized weather forecasts and timely alerts to protect your crops.',
+    titleKey: 'onboarding.slide4Title',
+    descKey: 'onboarding.slide4Desc',
     image: require('../../assets/onboarding_weather.jpg'),
   },
   {
     id: 5,
-    title: 'Expert Helpline',
-    description: 'Connect with agricultural experts via voice call for instant guidance.',
+    titleKey: 'onboarding.slide5Title',
+    descKey: 'onboarding.slide5Desc',
     image: require('../../assets/onboarding_helpline.png'),
   },
 ];
@@ -44,6 +45,7 @@ interface OnboardingScreenProps {
 }
 
 export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
+  const { t } = useTranslation();
   const [currentPage, setCurrentPage] = useState(0);
   const pagerRef = useRef<CrossPagerRef>(null);
   const [fontsLoaded] = useFonts({
@@ -77,7 +79,7 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
       <View style={styles.header}>
         <View style={{ flex: 1 }} />
         <Pressable onPress={handleSkip} style={styles.skipButton}>
-          <Text style={styles.skipText}>Skip</Text>
+          <Text style={styles.skipText}>{t('onboarding.skip')}</Text>
         </Pressable>
       </View>
 
@@ -93,8 +95,8 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
             <View style={styles.imageContainer}>
               <Image source={slide.image} style={styles.image} resizeMode="contain" />
             </View>
-            <Text style={styles.title}>{slide.title}</Text>
-            <Text style={styles.description}>{slide.description}</Text>
+            <Text style={styles.title}>{t(slide.titleKey)}</Text>
+            <Text style={styles.description}>{t(slide.descKey)}</Text>
           </View>
         ))}
       </CrossPager>
@@ -117,7 +119,7 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
         {/* Next / Get Started button */}
         <Pressable style={styles.nextButton} onPress={handleNext}>
           <Text style={styles.nextButtonText}>
-            {currentPage === slides.length - 1 ? 'Get Started' : 'Next'}
+            {currentPage === slides.length - 1 ? t('onboarding.getStarted') : t('onboarding.next')}
           </Text>
         </Pressable>
       </View>

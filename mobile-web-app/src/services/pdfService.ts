@@ -105,6 +105,16 @@ function buildReportHtml(data: DetectResponse | AnimalDetectResponse): string {
   const statusColor = isHealthy ? '#2E7D32' : '#E65100';
   const statusText = isHealthy ? 'Healthy' : 'Disease Detected';
 
+  // Detect RTL content for proper font and direction
+  const isRtl = reportHasRtl(d);
+  const googleFontLink = isRtl
+    ? `<link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">`
+    : '';
+  const bodyFontFamily = isRtl
+    ? "'Noto Naskh Arabic', 'Helvetica Neue', Helvetica, Arial, sans-serif"
+    : "'Helvetica Neue', Helvetica, Arial, sans-serif";
+  const bodyDirection = isRtl ? 'rtl' : 'ltr';
+
   // Build symptom bullets
   const symptomsHtml =
     d.symptoms.length > 0
@@ -136,16 +146,18 @@ function buildReportHtml(data: DetectResponse | AnimalDetectResponse): string {
 <html>
 <head>
   <meta charset="utf-8" />
+  ${googleFontLink}
   <style>
     @page { margin: 20px; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      font-family: ${bodyFontFamily};
       color: #1a1a1a;
       line-height: 1.6;
       padding: 32px;
       max-width: 600px;
       margin: 0 auto;
+      direction: ${bodyDirection};
     }
 
     /* Header */
@@ -392,11 +404,28 @@ function escapeHtml(text: string): string {
 // Pure JS, zero native dependencies, no html2canvas needed.
 // =========================================================
 
+/** Check if a string contains Arabic/Urdu/Sindhi script characters */
+function hasRtlText(text: string): boolean {
+  return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text);
+}
+
+/** Check if any text in the report contains RTL characters */
+function reportHasRtl(d: NormalizedReport): boolean {
+  const texts = [
+    d.disease_name, d.scientific_name, d.causes,
+    d.treatment_recommendations, d.message,
+    d.category_value, d.affected_value,
+    ...d.symptoms, ...d.prevention_tips,
+  ];
+  return texts.some(t => t && hasRtlText(t));
+}
+
 async function generateWebPdf(data: DetectResponse | AnimalDetectResponse): Promise<void> {
   const d = normalizeReport(data);
   const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
 
   const doc = await PDFDocument.create();
+
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const boldFont = await doc.embedFont(StandardFonts.HelveticaBold);
   const italicFont = await doc.embedFont(StandardFonts.HelveticaOblique);
@@ -557,7 +586,6 @@ async function generateWebPdf(data: DetectResponse | AnimalDetectResponse): Prom
   });
   const confidencePct =
     d.confidence != null ? (d.confidence * 100).toFixed(1) : null;
-  const isHealthy = d.disease_name?.toLowerCase() === 'healthy';
 
   // ─── NOT A POSITIVE SCAN ───
   if (!d.is_positive) {
@@ -584,6 +612,7 @@ async function generateWebPdf(data: DetectResponse | AnimalDetectResponse): Prom
     drawWrappedText(msg, font, 10, medGray, 0);
     y -= 60;
   } else {
+    const isHealthy = d.disease_name?.toLowerCase() === 'healthy';
     // ─── STATUS BADGE ───
     ensureSpace(30);
     const statusBg = isHealthy ? lightGreenBg : lightOrangeBg;
@@ -792,6 +821,33 @@ async function generateWebPdf(data: DetectResponse | AnimalDetectResponse): Prom
 }
 
 // =========================================================
+// Web RTL PDF — browser native rendering for Urdu/Sindhi.
+// Opens HTML report in a new tab and triggers the print dialog.
+// The browser's rendering engine handles Arabic text shaping
+// perfectly (connected letters, proper RTL layout).
+// User clicks "Save as PDF" in the print dialog to download.
+// =========================================================
+
+async function generateWebRtlPdf(data: DetectResponse | AnimalDetectResponse): Promise<void> {
+  const html = buildReportHtml(data);
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    // Popup blocked — open as blob URL instead
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    URL.revokeObjectURL(url);
+    return;
+  }
+  printWindow.document.write(html);
+  printWindow.document.close();
+  // Wait for fonts and images to load, then trigger print
+  printWindow.addEventListener('load', () => {
+    setTimeout(() => printWindow.print(), 500);
+  });
+}
+
+// =========================================================
 // Public API
 // =========================================================
 
@@ -806,8 +862,14 @@ export const pdfService = {
    */
   async generateAndShareReport(data: DetectResponse | AnimalDetectResponse): Promise<void> {
     if (Platform.OS === 'web') {
-      // Web: direct PDF download using jsPDF
-      await generateWebPdf(data);
+      const d = normalizeReport(data);
+      if (reportHasRtl(d)) {
+        // Urdu/Sindhi: browser native HTML rendering (perfect Arabic text shaping)
+        await generateWebRtlPdf(data);
+      } else {
+        // English: pdf-lib direct download
+        await generateWebPdf(data);
+      }
     } else {
       // Native: HTML → PDF via expo-print → share via expo-sharing
       const html = buildReportHtml(data);

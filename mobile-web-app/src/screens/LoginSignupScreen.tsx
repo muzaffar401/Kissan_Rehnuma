@@ -23,6 +23,7 @@ import {
   BeVietnamPro_600SemiBold,
 } from '@expo-google-fonts/be-vietnam-pro';
 import { colors } from '../theme/colors';
+import { useTranslation } from 'react-i18next';
 import { authService } from '../services/authService';
 import { weatherService } from '../services/weatherService';
 import { tokenStorage } from '../services/tokenStorage';
@@ -127,6 +128,7 @@ function OtpStep({
   onVerified: () => void;
   onBack: () => void;
 }) {
+  const { t } = useTranslation();
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -160,7 +162,7 @@ function OtpStep({
 
       onVerified();
     } catch (e: any) {
-      setError(e?.detail || 'Invalid OTP. Please try again.');
+      setError(e?.detail || t('auth.invalidOtp'));
     } finally {
       setLoading(false);
     }
@@ -169,20 +171,20 @@ function OtpStep({
   return (
     <View style={styles.formContainer}>
       <Text style={styles.otpInfo}>
-        An OTP was sent to {email}. Enter it below to verify your account.
+        {t('auth.otpInfo', { email })}
       </Text>
-      <FormInput label="OTP Code" placeholder="6-digit code" value={otp} onChangeText={setOtp} keyboardType="phone-pad" />
+      <FormInput label={t('auth.otpCodeLabel')} placeholder={t('auth.otpCodePlaceholder')} value={otp} onChangeText={setOtp} keyboardType="phone-pad" />
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       <Pressable style={styles.submitButton} onPress={handleVerify} disabled={loading}>
         {loading ? <ActivityIndicator color={colors.onPrimary} /> : (
           <>
-            <Text style={styles.submitButtonText}>Verify Email</Text>
+            <Text style={styles.submitButtonText}>{t('auth.verifyEmail')}</Text>
             <Text style={styles.submitButtonArrow}>→</Text>
           </>
         )}
       </Pressable>
       <Pressable style={styles.skipButton} onPress={onBack}>
-        <Text style={styles.skipButtonText}>← Back to Sign Up</Text>
+        <Text style={styles.skipButtonText}>{t('auth.backToSignup')}</Text>
       </Pressable>
     </View>
   );
@@ -191,6 +193,7 @@ function OtpStep({
 // ── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function LoginSignupScreen({ onComplete }: LoginSignupScreenProps) {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
   const [showOtp, setShowOtp] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -254,7 +257,7 @@ export default function LoginSignupScreen({ onComplete }: LoginSignupScreenProps
       await authService.forgotPassword({ email: forgotEmail.trim() });
       setForgotStep('otp');
     } catch (e: any) {
-      setError(e?.detail || 'Failed to send OTP. Please try again.');
+      setError(e?.detail || t('auth.forgotOtpFailed'));
     } finally {
       setLoading(false);
     }
@@ -265,7 +268,7 @@ export default function LoginSignupScreen({ onComplete }: LoginSignupScreenProps
     if (otpError) { setError(otpError); return; }
     const pwError = validatePassword(newPassword);
     if (pwError) { setError(pwError); return; }
-    if (newPassword !== confirmPassword) { setError('Passwords do not match.'); return; }
+    if (newPassword !== confirmPassword) { setError(t('auth.passwordsNotMatch')); return; }
     setLoading(true);
     setError('');
     try {
@@ -279,9 +282,9 @@ export default function LoginSignupScreen({ onComplete }: LoginSignupScreenProps
       setLoginEmail(forgotEmail.trim());
       setLoginPassword('');
       setError('');
-      Alert.alert('Success', 'Password reset successfully. Please login with your new password.');
+      Alert.alert(t('auth.resetSuccessTitle'), t('auth.resetSuccessMessage'));
     } catch (e: any) {
-      setError(e?.detail || 'Password reset failed. Please try again.');
+      setError(e?.detail || t('auth.resetFailed'));
     } finally {
       setLoading(false);
     }
@@ -298,7 +301,7 @@ export default function LoginSignupScreen({ onComplete }: LoginSignupScreenProps
       await authService.login({ email: loginEmail.trim(), password: loginPassword });
       onComplete('login');
     } catch (e: any) {
-      setError(e?.detail || 'Login failed. Please check your credentials.');
+      setError(e?.detail || t('auth.loginFailed'));
     } finally {
       setLoading(false);
     }
@@ -341,7 +344,7 @@ export default function LoginSignupScreen({ onComplete }: LoginSignupScreenProps
       });
       setShowOtp(true);
     } catch (e: any) {
-      setError(e?.detail || 'Signup failed. Please try again.');
+      setError(e?.detail || t('auth.signupFailed'));
     } finally {
       setLoading(false);
     }
@@ -356,7 +359,7 @@ export default function LoginSignupScreen({ onComplete }: LoginSignupScreenProps
 
       <View style={styles.appBar}>
         <Image source={require('../../assets/logo.jpg')} style={styles.appBarLogo} />
-        <Text style={styles.appBarTitle}>Kissan Rehnuma</Text>
+        <Text style={styles.appBarTitle}>{t('common.appName')}</Text>
         <View style={{ width: 32 }} />
       </View>
 
@@ -368,8 +371,8 @@ export default function LoginSignupScreen({ onComplete }: LoginSignupScreenProps
       >
         <View style={styles.glassPanel}>
           <View style={styles.cardHeader}>
-            <Text style={styles.welcomeText}>Welcome</Text>
-            <Text style={styles.subtitleText}>Please login or sign up to continue.</Text>
+            <Text style={styles.welcomeText}>{t('auth.welcome')}</Text>
+            <Text style={styles.subtitleText}>{t('auth.subtitle')}</Text>
           </View>
 
           {/* Tab Bar — hidden during OTP or forgot password */}
@@ -377,13 +380,13 @@ export default function LoginSignupScreen({ onComplete }: LoginSignupScreenProps
             <View style={styles.tabContainer}>
               <Pressable style={styles.tabButton} onPress={() => switchTab('login')}>
                 <Text style={[styles.tabText, activeTab === 'login' ? styles.tabTextActive : styles.tabTextInactive]}>
-                  Login
+                  {t('auth.login')}
                 </Text>
                 {activeTab === 'login' && <View style={styles.tabIndicator} />}
               </Pressable>
               <Pressable style={styles.tabButton} onPress={() => switchTab('signup')}>
                 <Text style={[styles.tabText, activeTab === 'signup' ? styles.tabTextActive : styles.tabTextInactive]}>
-                  Sign Up
+                  {t('auth.signup')}
                 </Text>
                 {activeTab === 'signup' && <View style={styles.tabIndicator} />}
               </Pressable>
@@ -406,16 +409,16 @@ export default function LoginSignupScreen({ onComplete }: LoginSignupScreenProps
           {/* Login Form */}
           {!showOtp && !forgotStep && activeTab === 'login' && (
             <View style={styles.formContainer}>
-              <FormInput label="Email" placeholder="Enter your email" keyboardType="email-address" value={loginEmail} onChangeText={setLoginEmail} />
-              <FormInput label="Password" placeholder="Enter your password" secureTextEntry value={loginPassword} onChangeText={setLoginPassword} />
+              <FormInput label={t('auth.emailLabel')} placeholder={t('auth.emailPlaceholder')} keyboardType="email-address" value={loginEmail} onChangeText={setLoginEmail} />
+              <FormInput label={t('auth.passwordLabel')} placeholder={t('auth.passwordPlaceholder')} secureTextEntry value={loginPassword} onChangeText={setLoginPassword} />
               <Pressable onPress={() => { setForgotStep('email'); setError(''); setForgotEmail(loginEmail); }}>
-                <Text style={styles.forgotLink}>Forgot Password?</Text>
+                <Text style={styles.forgotLink}>{t('auth.forgotPassword')}</Text>
               </Pressable>
               {error ? <Text style={styles.errorText}>{error}</Text> : null}
               <Pressable style={styles.submitButton} onPress={handleLogin} disabled={loading}>
                 {loading ? <ActivityIndicator color={colors.onPrimary} /> : (
                   <>
-                    <Text style={styles.submitButtonText}>Login</Text>
+                    <Text style={styles.submitButtonText}>{t('auth.loginButton')}</Text>
                     <Text style={styles.submitButtonArrow}>→</Text>
                   </>
                 )}
@@ -427,20 +430,20 @@ export default function LoginSignupScreen({ onComplete }: LoginSignupScreenProps
           {forgotStep === 'email' && (
             <View style={styles.formContainer}>
               <Text style={styles.otpInfo}>
-                Enter your registered email. We'll send a 6-digit OTP to reset your password.
+                {t('auth.forgotEmailInfo')}
               </Text>
-              <FormInput label="Email" placeholder="Enter your email" keyboardType="email-address" value={forgotEmail} onChangeText={setForgotEmail} />
+              <FormInput label={t('auth.emailLabel')} placeholder={t('auth.emailPlaceholder')} keyboardType="email-address" value={forgotEmail} onChangeText={setForgotEmail} />
               {error ? <Text style={styles.errorText}>{error}</Text> : null}
               <Pressable style={styles.submitButton} onPress={handleForgotSendOtp} disabled={loading}>
                 {loading ? <ActivityIndicator color={colors.onPrimary} /> : (
                   <>
-                    <Text style={styles.submitButtonText}>Send OTP</Text>
+                    <Text style={styles.submitButtonText}>{t('auth.sendOtp')}</Text>
                     <Text style={styles.submitButtonArrow}>→</Text>
                   </>
                 )}
               </Pressable>
               <Pressable style={styles.skipButton} onPress={() => { setForgotStep(null); setError(''); }}>
-                <Text style={styles.skipButtonText}>← Back to Login</Text>
+                <Text style={styles.skipButtonText}>{t('auth.backToLogin')}</Text>
               </Pressable>
             </View>
           )}
@@ -449,22 +452,22 @@ export default function LoginSignupScreen({ onComplete }: LoginSignupScreenProps
           {forgotStep === 'otp' && (
             <View style={styles.formContainer}>
               <Text style={styles.otpInfo}>
-                OTP sent to {forgotEmail}. Enter it below and set your new password.
+                {t('auth.forgotOtpInfo', { email: forgotEmail })}
               </Text>
-              <FormInput label="OTP Code" placeholder="6-digit code" value={resetOtp} onChangeText={setResetOtp} keyboardType="phone-pad" />
-              <FormInput label="New Password" placeholder="Enter new password" secureTextEntry value={newPassword} onChangeText={setNewPassword} />
-              <FormInput label="Confirm Password" placeholder="Confirm new password" secureTextEntry value={confirmPassword} onChangeText={setConfirmPassword} />
+              <FormInput label={t('auth.otpCodeLabel')} placeholder={t('auth.otpCodePlaceholder')} value={resetOtp} onChangeText={setResetOtp} keyboardType="phone-pad" />
+              <FormInput label={t('auth.newPasswordLabel')} placeholder={t('auth.newPasswordPlaceholder')} secureTextEntry value={newPassword} onChangeText={setNewPassword} />
+              <FormInput label={t('auth.confirmPasswordLabel')} placeholder={t('auth.confirmPasswordPlaceholder')} secureTextEntry value={confirmPassword} onChangeText={setConfirmPassword} />
               {error ? <Text style={styles.errorText}>{error}</Text> : null}
               <Pressable style={styles.submitButton} onPress={handleResetPassword} disabled={loading}>
                 {loading ? <ActivityIndicator color={colors.onPrimary} /> : (
                   <>
-                    <Text style={styles.submitButtonText}>Reset Password</Text>
+                    <Text style={styles.submitButtonText}>{t('auth.resetPassword')}</Text>
                     <Text style={styles.submitButtonArrow}>→</Text>
                   </>
                 )}
               </Pressable>
               <Pressable style={styles.skipButton} onPress={() => { setForgotStep('email'); setError(''); }}>
-                <Text style={styles.skipButtonText}>← Back</Text>
+                <Text style={styles.skipButtonText}>{t('auth.back')}</Text>
               </Pressable>
             </View>
           )}
@@ -474,30 +477,30 @@ export default function LoginSignupScreen({ onComplete }: LoginSignupScreenProps
             <View style={styles.formContainer}>
               <View style={styles.row}>
                 <View style={styles.rowItem}>
-                  <FormInput label="First Name" placeholder="First Name" value={firstName} onChangeText={setFirstName} />
+                  <FormInput label={t('auth.firstNameLabel')} placeholder={t('auth.firstNamePlaceholder')} value={firstName} onChangeText={setFirstName} />
                 </View>
                 <View style={styles.rowItem}>
-                  <FormInput label="Last Name" placeholder="Last Name" value={lastName} onChangeText={setLastName} />
+                  <FormInput label={t('auth.lastNameLabel')} placeholder={t('auth.lastNamePlaceholder')} value={lastName} onChangeText={setLastName} />
                 </View>
               </View>
-              <FormInput label="Email" placeholder="Email Address" keyboardType="email-address" value={signupEmail} onChangeText={setSignupEmail} />
-              <FormInput label="Password" placeholder="Create a password" secureTextEntry value={signupPassword} onChangeText={setSignupPassword} />
-              <FormInput label="CNIC" placeholder="XXXXX-XXXXXXX-X" value={cnic} onChangeText={setCnic} />
-              <FormInput label="Phone" placeholder="Phone Number" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
-              <FormInput label="Address" placeholder="Street Address" value={address} onChangeText={setAddress} />
+              <FormInput label={t('auth.emailLabel')} placeholder={t('auth.emailAddressPlaceholder')} keyboardType="email-address" value={signupEmail} onChangeText={setSignupEmail} />
+              <FormInput label={t('auth.passwordLabel')} placeholder={t('auth.createPasswordPlaceholder')} secureTextEntry value={signupPassword} onChangeText={setSignupPassword} />
+              <FormInput label={t('auth.cnicLabel')} placeholder={t('auth.cnicPlaceholder')} value={cnic} onChangeText={setCnic} />
+              <FormInput label={t('auth.phoneLabel')} placeholder={t('auth.phonePlaceholder')} keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
+              <FormInput label={t('auth.addressLabel')} placeholder={t('auth.addressPlaceholder')} value={address} onChangeText={setAddress} />
               <View style={styles.row}>
                 <View style={styles.rowItem}>
-                  <FormInput label="City" placeholder="City" value={city} onChangeText={setCity} />
+                  <FormInput label={t('auth.cityLabel')} placeholder={t('auth.cityPlaceholder')} value={city} onChangeText={setCity} />
                 </View>
                 <View style={styles.rowItem}>
-                  <FormInput label="Country" placeholder="Country" value={country} onChangeText={setCountry} />
+                  <FormInput label={t('auth.countryLabel')} placeholder={t('auth.countryPlaceholder')} value={country} onChangeText={setCountry} />
                 </View>
               </View>
               {error ? <Text style={styles.errorText}>{error}</Text> : null}
               <Pressable style={styles.submitButton} onPress={handleSignup} disabled={loading}>
                 {loading ? <ActivityIndicator color={colors.onPrimary} /> : (
                   <>
-                    <Text style={styles.submitButtonText}>Sign Up</Text>
+                    <Text style={styles.submitButtonText}>{t('auth.signupButton')}</Text>
                     <Text style={styles.submitButtonArrow}>→</Text>
                   </>
                 )}

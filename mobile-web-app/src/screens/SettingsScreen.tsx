@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   Animated,
   Image,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -22,8 +23,19 @@ import {
   BeVietnamPro_500Medium,
   BeVietnamPro_600SemiBold,
 } from '@expo-google-fonts/be-vietnam-pro';
+import { NotoNastaliqUrdu_400Regular } from '@expo-google-fonts/noto-nastaliq-urdu';
 import { colors } from '../theme/colors';
+import { useTranslation } from 'react-i18next';
 import { tokenStorage } from '../services/tokenStorage';
+import { LANGUAGE_NAMES } from '../i18n';
+import type { SupportedLanguage } from '../i18n';
+import i18n from '../i18n';
+
+const LANGUAGE_OPTIONS: { id: SupportedLanguage; nativeName: string }[] = [
+  { id: 'en', nativeName: 'English' },
+  { id: 'ur', nativeName: 'اردو' },
+  { id: 'sd', nativeName: 'سنڌي' },
+];
 
 type BottomTab = 'home' | 'disease' | 'weather' | 'market' | 'helpline';
 
@@ -31,59 +43,21 @@ interface SettingsScreenProps {
   onNavigate?: (screen: string) => void;
 }
 
-const bottomTabs: { key: BottomTab; icon: string; label: string }[] = [
-  { key: 'home', icon: 'home', label: 'Home' },
-  { key: 'disease', icon: 'leaf', label: 'Disease' },
-  { key: 'weather', icon: 'weather-sunny', label: 'Weather' },
-  { key: 'market', icon: 'tag', label: 'Market' },
-  { key: 'helpline', icon: 'phone', label: 'Helpline' },
+const BOTTOM_TABS: { key: BottomTab; icon: string; labelKey: string }[] = [
+  { key: 'home', icon: 'home', labelKey: 'common.nav.home' },
+  { key: 'disease', icon: 'leaf', labelKey: 'common.nav.disease' },
+  { key: 'weather', icon: 'weather-sunny', labelKey: 'common.nav.weather' },
+  { key: 'market', icon: 'tag', labelKey: 'common.nav.market' },
+  { key: 'helpline', icon: 'phone', labelKey: 'common.nav.helpline' },
 ];
 
-const settingsItems = [
-  {
-    id: 'account',
-    icon: 'account',
-    title: 'Account Information',
-    subtitle: 'Phone, Email, Password',
-    type: 'link' as const,
-  },
-  {
-    id: 'language',
-    icon: 'translate',
-    title: 'Language',
-    subtitle: 'Current: Urdu',
-    type: 'link' as const,
-  },
-  {
-    id: 'notifications',
-    icon: 'bell',
-    title: 'Notifications',
-    subtitle: 'Weather & Crop Alerts',
-    type: 'toggle' as const,
-    defaultOn: true,
-  },
-  {
-    id: 'darkmode',
-    icon: 'brightness-6',
-    title: 'Dark Mode',
-    subtitle: 'Optimize for low light',
-    type: 'toggle' as const,
-    defaultOn: false,
-  },
-  {
-    id: 'help',
-    icon: 'help-circle',
-    title: 'Help & Support',
-    subtitle: 'FAQs and Helpline',
-    type: 'link' as const,
-  },
-  {
-    id: 'about',
-    icon: 'information',
-    title: 'About Kissan Rehnuma',
-    subtitle: 'Version 2.1.0 \u2022 Privacy Policy',
-    type: 'link' as const,
-  },
+const SETTINGS_ITEMS = [
+  { id: 'account', icon: 'account', titleKey: 'settings.accountInfo', subtitleKey: 'settings.accountSubtitle', type: 'link' as const },
+  { id: 'language', icon: 'translate', titleKey: 'settings.language', subtitleKey: 'settings.languageSubtitle', type: 'link' as const, dynamic: true },
+  { id: 'notifications', icon: 'bell', titleKey: 'settings.notifications', subtitleKey: 'settings.notificationsSubtitle', type: 'toggle' as const, defaultOn: true },
+  { id: 'darkmode', icon: 'brightness-6', titleKey: 'settings.darkMode', subtitleKey: 'settings.darkModeSubtitle', type: 'toggle' as const, defaultOn: false },
+  { id: 'help', icon: 'help-circle', titleKey: 'settings.helpSupport', subtitleKey: 'settings.helpSubtitle', type: 'link' as const },
+  { id: 'about', icon: 'information', titleKey: 'settings.about', subtitleKey: 'settings.aboutSubtitle', type: 'link' as const },
 ];
 
 // Custom toggle switch component
@@ -111,18 +85,21 @@ function ToggleSwitch({ value, onToggle }: { value: boolean; onToggle: () => voi
 }
 
 export default function SettingsScreen({ onNavigate }: SettingsScreenProps) {
+  const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const [bottomActive, setBottomActive] = useState<BottomTab>('home');
   const [toggles, setToggles] = useState<Record<string, boolean>>({
     notifications: true,
     darkmode: false,
   });
+  const [showLangPicker, setShowLangPicker] = useState(false);
   const [fontsLoaded] = useFonts({
     PlusJakartaSans_600SemiBold,
     PlusJakartaSans_700Bold,
     BeVietnamPro_400Regular,
     BeVietnamPro_500Medium,
     BeVietnamPro_600SemiBold,
+    NotoNastaliqUrdu_400Regular,
   });
 
   const isWide = width > 600;
@@ -134,6 +111,12 @@ export default function SettingsScreen({ onNavigate }: SettingsScreenProps) {
 
   const handleToggle = (id: string) => {
     setToggles((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleChangeLanguage = async (langId: SupportedLanguage) => {
+    await i18n.changeLanguage(langId);
+    await tokenStorage.setOnboardingComplete(langId); // persist language
+    setShowLangPicker(false);
   };
 
   return (
@@ -150,7 +133,7 @@ export default function SettingsScreen({ onNavigate }: SettingsScreenProps) {
             color={colors.onSurfaceVariant}
           />
         </Pressable>
-        <Text style={styles.appBarTitle}>Settings & Profile</Text>
+        <Text style={styles.appBarTitle}>{t('settings.title')}</Text>
         <View style={styles.appBarSpacer} />
       </View>
 
@@ -193,10 +176,13 @@ export default function SettingsScreen({ onNavigate }: SettingsScreenProps) {
 
         {/* Settings List */}
         <View style={styles.settingsList}>
-          {settingsItems.map((item) => (
+          {SETTINGS_ITEMS.map((item) => (
             <View key={item.id} style={styles.settingsCard}>
               {item.type === 'link' ? (
-                <Pressable style={styles.settingsRow}>
+                <Pressable
+                  style={styles.settingsRow}
+                  onPress={item.id === 'language' ? () => setShowLangPicker(true) : undefined}
+                >
                   <View style={styles.settingsRowLeft}>
                     <MaterialCommunityIcons
                       name={item.icon as any}
@@ -204,9 +190,12 @@ export default function SettingsScreen({ onNavigate }: SettingsScreenProps) {
                       color={colors.primaryContainer}
                     />
                     <View style={styles.settingsRowText}>
-                      <Text style={styles.settingsRowTitle}>{item.title}</Text>
+                      <Text style={styles.settingsRowTitle}>{t(item.titleKey)}</Text>
                       <Text style={styles.settingsRowSubtitle}>
-                        {item.subtitle}
+                        {item.id === 'language'
+                          ? t('settings.languageSubtitle', { language: LANGUAGE_NAMES[(i18n.language as keyof typeof LANGUAGE_NAMES) || 'en'] || 'English' })
+                          : t(item.subtitleKey)
+                        }
                       </Text>
                     </View>
                   </View>
@@ -225,9 +214,9 @@ export default function SettingsScreen({ onNavigate }: SettingsScreenProps) {
                       color={colors.primaryContainer}
                     />
                     <View style={styles.settingsRowText}>
-                      <Text style={styles.settingsRowTitle}>{item.title}</Text>
+                      <Text style={styles.settingsRowTitle}>{t(item.titleKey)}</Text>
                       <Text style={styles.settingsRowSubtitle}>
-                        {item.subtitle}
+                        {t(item.subtitleKey)}
                       </Text>
                     </View>
                   </View>
@@ -249,13 +238,13 @@ export default function SettingsScreen({ onNavigate }: SettingsScreenProps) {
             onNavigate?.('login');
           }}
         >
-          <Text style={styles.logoutText}>Logout</Text>
+          <Text style={styles.logoutText}>{t('settings.logout')}</Text>
         </Pressable>
       </ScrollView>
 
       {/* Bottom Navigation */}
       <View style={styles.bottomNav}>
-        {bottomTabs.map((tab) => {
+        {BOTTOM_TABS.map((tab) => {
           const isActive = bottomActive === tab.key;
           return (
             <Pressable
@@ -285,12 +274,60 @@ export default function SettingsScreen({ onNavigate }: SettingsScreenProps) {
                   isActive ? styles.navLabelActive : styles.navLabelInactive,
                 ]}
               >
-                {tab.label}
+                {t(tab.labelKey)}
               </Text>
             </Pressable>
           );
         })}
       </View>
+      {/* Language Picker Modal */}
+      <Modal
+        visible={showLangPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowLangPicker(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowLangPicker(false)}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>{t('language.title')}</Text>
+            {LANGUAGE_OPTIONS.map((lang) => {
+              const isActive = i18n.language === lang.id;
+              return (
+                <Pressable
+                  key={lang.id}
+                  style={[styles.langOption, isActive && styles.langOptionActive]}
+                  onPress={() => handleChangeLanguage(lang.id)}
+                >
+                  <View>
+                    <Text
+                      style={[
+                        styles.langNativeName,
+                        lang.id === 'ur' && styles.langNativeNameUrdu,
+                        isActive && styles.langNativeNameActive,
+                      ]}
+                    >
+                      {lang.nativeName}
+                    </Text>
+                    <Text style={styles.langEnglishName}>
+                      {LANGUAGE_NAMES[lang.id]}
+                    </Text>
+                  </View>
+                  {isActive && (
+                    <MaterialCommunityIcons
+                      name="check-circle"
+                      size={24}
+                      color={colors.primary}
+                    />
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -511,5 +548,63 @@ const styles = StyleSheet.create({
   },
   navLabelInactive: {
     color: colors.onSurfaceVariant,
+  },
+  // ─── Language Picker Modal ───
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  modalContent: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 380,
+    gap: 12,
+  },
+  modalTitle: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.primary,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  langOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.surfaceVariant,
+  },
+  langOptionActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryContainer + '18',
+  },
+  langNativeName: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.onSurface,
+  },
+  langNativeNameUrdu: {
+    fontFamily: 'NotoNastaliqUrdu_400Regular',
+    fontSize: 20,
+    lineHeight: 36,
+  },
+  langNativeNameActive: {
+    color: colors.primary,
+  },
+  langEnglishName: {
+    fontFamily: 'BeVietnamPro_400Regular',
+    fontSize: 12,
+    color: colors.onSurfaceVariant,
+    marginTop: 2,
   },
 });

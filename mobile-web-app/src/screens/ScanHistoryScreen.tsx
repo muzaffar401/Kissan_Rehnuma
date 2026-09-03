@@ -36,6 +36,7 @@ import {
   BeVietnamPro_600SemiBold,
 } from '@expo-google-fonts/be-vietnam-pro';
 import { colors } from '../theme/colors';
+import { useTranslation } from 'react-i18next';
 import { cropService, animalService, pdfService, type ApiError } from '../services';
 import type { HistoryItem } from '../services/cropService';
 import type { AnimalHistoryItem } from '../services/animalService';
@@ -61,6 +62,7 @@ interface ScanHistoryScreenProps {
 export default function ScanHistoryScreen({
   onNavigate,
 }: ScanHistoryScreenProps) {
+  const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const isWide = width > 480;
 
@@ -140,7 +142,7 @@ export default function ScanHistoryScreen({
     } catch (err) {
       const apiErr = err as ApiError;
       setErrorMessage(
-        apiErr.detail || 'Failed to load scan history. Please try again.',
+        apiErr.detail || t('scanHistory.failedLoadDefault'),
       );
     } finally {
       setLoading(false);
@@ -163,9 +165,9 @@ export default function ScanHistoryScreen({
     } catch (err) {
       console.error('PDF generation failed:', err);
       if (Platform.OS === 'web') {
-        window.alert('Failed to generate report.');
+        window.alert(t('scanHistory.errorGenerateReport'));
       } else {
-        Alert.alert('Error', 'Failed to generate report.');
+        Alert.alert(t('common.error'), t('scanHistory.errorGenerateReport'));
       }
     }
   };
@@ -243,7 +245,7 @@ export default function ScanHistoryScreen({
               color="#fff"
             />
             <Text style={styles.statusBadgeText}>
-              {isHealthy ? 'Healthy' : 'Disease'}
+              {isHealthy ? t('scanHistory.healthy') : t('scanHistory.diseaseStatus')}
             </Text>
           </View>
           {/* Category badge */}
@@ -253,14 +255,14 @@ export default function ScanHistoryScreen({
               size={12}
               color="#fff"
             />
-            <Text style={styles.categoryBadgeText}>{item.category}</Text>
+            <Text style={styles.categoryBadgeText}>{item.category === 'Crop' ? t('scanHistory.cropCategory') : t('scanHistory.animalCategory')}</Text>
           </View>
         </View>
 
         {/* Card body */}
         <View style={styles.cardBody}>
           <Text style={styles.cardDiseaseName} numberOfLines={1}>
-            {item.disease_name || 'Unknown'}
+            {item.disease_name || t('disease.unknown')}
           </Text>
 
           {item.categoryType && (
@@ -271,7 +273,7 @@ export default function ScanHistoryScreen({
 
           {confidencePct && (
             <View style={styles.confidenceRow}>
-              <Text style={styles.confidenceLabel}>Confidence</Text>
+              <Text style={styles.confidenceLabel}>{t('scanHistory.confidenceLabel')}</Text>
               <Text
                 style={[
                   styles.confidenceValue,
@@ -291,8 +293,7 @@ export default function ScanHistoryScreen({
               color={colors.onSurfaceVariant}
             />
             <Text style={styles.dateText}>
-              {formatDate(item.created_at || '')} at{' '}
-              {formatTime(item.created_at || '')}
+              {t('scanHistory.dateAtTime', { date: formatDate(item.created_at || ''), time: formatTime(item.created_at || '') })}
             </Text>
           </View>
 
@@ -301,7 +302,7 @@ export default function ScanHistoryScreen({
             <Text style={styles.symptomsPreview} numberOfLines={2}>
               {item.symptoms[0]}
               {item.symptoms.length > 1
-                ? ` +${item.symptoms.length - 1} more`
+                ? t('scanHistory.symptomsMore', { count: item.symptoms.length - 1 })
                 : ''}
             </Text>
           )}
@@ -316,7 +317,7 @@ export default function ScanHistoryScreen({
               size={18}
               color={colors.primary}
             />
-            <Text style={styles.downloadBtnText}>Download Report</Text>
+            <Text style={styles.downloadBtnText}>{t('scanHistory.downloadReport')}</Text>
           </Pressable>
         </View>
       </View>
@@ -335,12 +336,12 @@ export default function ScanHistoryScreen({
               color={colors.onSurfaceVariant}
             />
           </Pressable>
-          <Text style={styles.appBarTitle}>Scan History</Text>
+          <Text style={styles.appBarTitle}>{t('scanHistory.title')}</Text>
           <View style={styles.appBarIconBtn} />
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading scan history...</Text>
+          <Text style={styles.loadingText}>{t('scanHistory.loadingHistory')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -358,7 +359,7 @@ export default function ScanHistoryScreen({
               color={colors.onSurfaceVariant}
             />
           </Pressable>
-          <Text style={styles.appBarTitle}>Scan History</Text>
+          <Text style={styles.appBarTitle}>{t('scanHistory.title')}</Text>
           <View style={styles.appBarIconBtn} />
         </View>
         <View style={styles.errorContainer}>
@@ -367,7 +368,7 @@ export default function ScanHistoryScreen({
             size={48}
             color={colors.onSurfaceVariant}
           />
-          <Text style={styles.errorTitle}>Couldn't Load History</Text>
+          <Text style={styles.errorTitle}>{t('scanHistory.couldntLoad')}</Text>
           <Text style={styles.errorMessage}>{errorMessage}</Text>
           <Pressable style={styles.retryButton} onPress={() => fetchHistory()}>
             <MaterialCommunityIcons
@@ -375,7 +376,7 @@ export default function ScanHistoryScreen({
               size={18}
               color={colors.onPrimary}
             />
-            <Text style={styles.retryButtonText}>Try Again</Text>
+            <Text style={styles.retryButtonText}>{t('common.tryAgain')}</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -408,7 +409,7 @@ export default function ScanHistoryScreen({
       {/* Summary bar */}
       <View style={styles.summaryBar}>
         <Text style={styles.summaryText}>
-          {scanData.length} {scanData.length === 1 ? 'scan' : 'scans'} found
+          {t('scanHistory.scansFound', { count: scanData.length })}
         </Text>
       </View>
 
@@ -420,9 +421,9 @@ export default function ScanHistoryScreen({
             size={64}
             color={colors.onSurfaceVariant}
           />
-          <Text style={styles.emptyTitle}>No Scans Yet</Text>
+          <Text style={styles.emptyTitle}>{t('scanHistory.noScansYet')}</Text>
           <Text style={styles.emptyMessage}>
-            Start scanning crops or livestock to see your diagnosis history here.
+            {t('scanHistory.noScansMessage')}
           </Text>
           <Pressable
             style={styles.scanNowButton}
@@ -433,7 +434,7 @@ export default function ScanHistoryScreen({
               size={18}
               color={colors.onPrimary}
             />
-            <Text style={styles.scanNowButtonText}>Scan Now</Text>
+            <Text style={styles.scanNowButtonText}>{t('scanHistory.scanNow')}</Text>
           </Pressable>
         </View>
       ) : (

@@ -27,6 +27,7 @@ import {
   BeVietnamPro_600SemiBold,
 } from '@expo-google-fonts/be-vietnam-pro';
 import { colors } from '../theme/colors';
+import { useTranslation } from 'react-i18next';
 import { cropService, animalService, type DetectResponse, type AnimalDetectResponse, type ApiError } from '../services';
 import { pdfService } from '../services/pdfService';
 
@@ -61,18 +62,19 @@ interface DiseaseScanScreenProps {
   onNavigate?: (screen: string) => void;
 }
 
-const bottomTabs: { key: BottomTab; icon: string; label: string }[] = [
-  { key: 'home', icon: 'home', label: 'Home' },
-  { key: 'disease', icon: 'leaf', label: 'Disease' },
-  { key: 'weather', icon: 'weather-sunny', label: 'Weather' },
-  { key: 'market', icon: 'tag', label: 'Market' },
-  { key: 'helpline', icon: 'phone', label: 'Helpline' },
+const BOTTOM_TABS: { key: BottomTab; icon: string; labelKey: string }[] = [
+  { key: 'home', icon: 'home', labelKey: 'common.nav.home' },
+  { key: 'disease', icon: 'leaf', labelKey: 'common.nav.disease' },
+  { key: 'weather', icon: 'weather-sunny', labelKey: 'common.nav.weather' },
+  { key: 'market', icon: 'tag', labelKey: 'common.nav.market' },
+  { key: 'helpline', icon: 'phone', labelKey: 'common.nav.helpline' },
 ];
 
 export default function DiseaseScanScreen({
   initialTab = 'crop',
   onNavigate,
 }: DiseaseScanScreenProps) {
+  const { t, i18n } = useTranslation();
   const { width } = useWindowDimensions();
   const [activeTab, setActiveTab] = useState<ScanTab>(initialTab);
   const [bottomActive, setBottomActive] = useState<BottomTab>('disease');
@@ -150,7 +152,7 @@ export default function DiseaseScanScreen({
         setErrorCode('');
       }
     } catch (err) {
-      Alert.alert('Error', 'Failed to pick image. Please try again.');
+      Alert.alert(t('common.error'), t('disease.errorPickImage'));
     }
   };
 
@@ -160,8 +162,8 @@ export default function DiseaseScanScreen({
       const permResult = await ImagePicker.requestCameraPermissionsAsync();
       if (!permResult.granted) {
         Alert.alert(
-          'Permission Required',
-          'Camera access is needed to take photos for disease detection.',
+          t('disease.cameraPermissionTitle'),
+          t('disease.cameraPermissionMessage'),
         );
         return;
       }
@@ -178,7 +180,7 @@ export default function DiseaseScanScreen({
         setErrorCode('');
       }
     } catch (err) {
-      Alert.alert('Error', 'Failed to take photo. Please try again.');
+      Alert.alert(t('common.error'), t('disease.errorTakePhoto'));
     }
   };
 
@@ -195,7 +197,7 @@ export default function DiseaseScanScreen({
 
       if (isCrop) {
         const result = await cropService.detectDisease(
-          selectedImage.uri, imageName, imageType,
+          selectedImage.uri, imageName, imageType, i18n.language,
         );
         setScanResult({
           scan_id: result.scan_id,
@@ -207,9 +209,9 @@ export default function DiseaseScanScreen({
           causes: result.causes,
           treatment_recommendations: result.treatment_recommendations,
           prevention_tips: result.prevention_tips || [],
-          category_label: 'Crop',
+          category_label: t('disease.scanCropTitle'),
           category_value: result.crop_type,
-          affected_label: 'Affected Crops',
+          affected_label: t('disease.affectedCrops'),
           affected_value: result.affected_crops,
           image_url: result.image_url,
           message: result.message,
@@ -217,7 +219,7 @@ export default function DiseaseScanScreen({
         });
       } else {
         const result = await animalService.detectDisease(
-          selectedImage.uri, imageName, imageType,
+          selectedImage.uri, imageName, imageType, i18n.language,
         );
         setScanResult({
           scan_id: result.scan_id,
@@ -229,9 +231,9 @@ export default function DiseaseScanScreen({
           causes: result.causes,
           treatment_recommendations: result.treatment_recommendations,
           prevention_tips: result.prevention_tips || [],
-          category_label: 'Animal',
+          category_label: t('disease.scanAnimalTitle'),
           category_value: result.animal_type,
-          affected_label: 'Affected Species',
+          affected_label: t('disease.affectedSpecies'),
           affected_value: result.affected_species,
           image_url: result.image_url,
           message: result.message,
@@ -244,7 +246,7 @@ export default function DiseaseScanScreen({
       setScanPhase('error');
       setErrorCode(apiErr.error_code || 'UNKNOWN');
       setErrorMessage(
-        apiErr.detail || 'Failed to analyze image. Please try again.',
+        apiErr.detail || t('disease.failedAnalyzeDefault'),
       );
     }
   };
@@ -261,9 +263,9 @@ export default function DiseaseScanScreen({
     } catch (err) {
       console.error('PDF generation failed:', err);
       if (Platform.OS === 'web') {
-        window.alert('Failed to generate report. Please try again.');
+        window.alert(t('disease.errorGenerateReport'));
       } else {
-        Alert.alert('Error', 'Failed to generate report. Please try again.');
+        Alert.alert(t('common.error'), t('disease.errorGenerateReport'));
       }
     } finally {
       setIsDownloadingReport(false);
@@ -287,10 +289,10 @@ export default function DiseaseScanScreen({
   const viewfinderMaxWidth = isWide ? 480 : width - 40;
 
   const isCrop = activeTab === 'crop';
-  const title = isCrop ? 'Scan Crop' : 'Scan Animal';
+  const title = isCrop ? t('disease.scanCropTitle') : t('disease.scanAnimalTitle');
   const instruction = isCrop
-    ? 'Place the leaf inside the frame and tap the button.'
-    : "Place the animal's affected area inside the frame and tap the button.";
+    ? t('disease.cropInstruction')
+    : t('disease.animalInstruction');
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -327,7 +329,7 @@ export default function DiseaseScanScreen({
           <Text
             style={[styles.tabText, isCrop && styles.tabTextActive]}
           >
-            Crop Disease
+            {t('disease.cropDiseaseTab')}
           </Text>
         </Pressable>
         <Pressable
@@ -342,7 +344,7 @@ export default function DiseaseScanScreen({
           <Text
             style={[styles.tabText, !isCrop && styles.tabTextActive]}
           >
-            Animal Disease
+            {t('disease.animalDiseaseTab')}
           </Text>
         </Pressable>
       </View>
@@ -391,7 +393,7 @@ export default function DiseaseScanScreen({
               {!isCrop && (
                 <View style={styles.aiBadge}>
                   <MaterialCommunityIcons name="auto-fix" size={16} color={colors.onSecondaryContainer} />
-                  <Text style={styles.aiBadgeText}>AI Active</Text>
+                  <Text style={styles.aiBadgeText}>{t('disease.aiActive')}</Text>
                 </View>
               )}
             </View>
@@ -399,11 +401,11 @@ export default function DiseaseScanScreen({
             {/* Action Buttons */}
             <Pressable style={styles.scanButton} onPress={handleTakePhoto}>
               <MaterialCommunityIcons name="camera" size={20} color={colors.onPrimary} />
-              <Text style={styles.scanButtonText}>Take Photo</Text>
+              <Text style={styles.scanButtonText}>{t('disease.takePhoto')}</Text>
             </Pressable>
             <Pressable style={styles.galleryButton} onPress={handlePickImage}>
               <MaterialCommunityIcons name="image" size={20} color={colors.primary} />
-              <Text style={styles.galleryButtonText}>Pick from Gallery</Text>
+              <Text style={styles.galleryButtonText}>{t('disease.pickFromGallery')}</Text>
             </Pressable>
           </>
         )}
@@ -424,11 +426,11 @@ export default function DiseaseScanScreen({
             </View>
             <Pressable style={styles.scanButton} onPress={handleScan}>
               <MaterialCommunityIcons name="magnify-scan" size={20} color={colors.onPrimary} />
-              <Text style={styles.scanButtonText}>Scan for Disease</Text>
+              <Text style={styles.scanButtonText}>{t('disease.scanForDisease')}</Text>
             </Pressable>
             <Pressable style={styles.retakeButton} onPress={handleReset}>
               <MaterialCommunityIcons name="refresh" size={18} color={colors.onSurfaceVariant} />
-              <Text style={styles.retakeButtonText}>Choose Another</Text>
+              <Text style={styles.retakeButtonText}>{t('disease.chooseAnother')}</Text>
             </Pressable>
           </>
         )}
@@ -444,8 +446,8 @@ export default function DiseaseScanScreen({
               />
               <View style={styles.analyzingOverlay}>
                 <ActivityIndicator size="large" color={colors.primaryFixedDim} />
-                <Text style={styles.analyzingText}>Analyzing...</Text>
-                <Text style={styles.analyzingSubtext}>AI is processing your image</Text>
+                <Text style={styles.analyzingText}>{t('disease.analyzing')}</Text>
+                <Text style={styles.analyzingSubtext}>{t('disease.aiProcessing')}</Text>
               </View>
               <Animated.View
                 style={[
@@ -460,7 +462,7 @@ export default function DiseaseScanScreen({
                 ]}
               />
             </View>
-            <Text style={styles.waitText}>Please wait, this may take a moment...</Text>
+            <Text style={styles.waitText}>{t('disease.pleaseWait')}</Text>
           </>
         )}
 
@@ -473,10 +475,10 @@ export default function DiseaseScanScreen({
                 <MaterialCommunityIcons name={isCrop ? 'leaf-off' : 'cat'} size={32} color="#FF9800" />
                 <View style={styles.resultHeaderText}>
                   <Text style={styles.resultDiseaseName}>
-                    {isCrop ? 'Not a Plant Image' : 'Not an Animal Image'}
+                    {isCrop ? t('disease.notPlantImage') : t('disease.notAnimalImage')}
                   </Text>
                   <Text style={styles.resultConfidence}>
-                    {scanResult.message || (isCrop ? 'Please upload a clear photo of a crop leaf.' : 'Please upload a clear photo of an animal.')}
+                    {scanResult.message || (isCrop ? t('disease.uploadClearCrop') : t('disease.uploadClearAnimal'))}
                   </Text>
                 </View>
               </View>
@@ -493,7 +495,7 @@ export default function DiseaseScanScreen({
                   />
                   <View style={styles.resultHeaderText}>
                     <Text style={styles.resultDiseaseName}>
-                      {scanResult.disease_name || 'Unknown'}
+                      {scanResult.disease_name || t('disease.unknown')}
                     </Text>
                     {scanResult.scientific_name ? (
                       <Text style={styles.resultConfidence}>
@@ -502,7 +504,7 @@ export default function DiseaseScanScreen({
                     ) : null}
                     {scanResult.confidence != null && (
                       <Text style={styles.resultConfidence}>
-                        Confidence: {(scanResult.confidence * 100).toFixed(1)}%
+                        {t('disease.confidence', { value: (scanResult.confidence * 100).toFixed(1) })}
                       </Text>
                     )}
                   </View>
@@ -520,7 +522,7 @@ export default function DiseaseScanScreen({
                 {/* Symptoms */}
                 {scanResult.symptoms.length > 0 && (
                   <View style={styles.resultSection}>
-                    <Text style={styles.resultSectionTitle}>Symptoms</Text>
+                    <Text style={styles.resultSectionTitle}>{t('disease.symptoms')}</Text>
                     {scanResult.symptoms.map((s: string, i: number) => (
                       <View key={i} style={styles.resultBulletRow}>
                         <MaterialCommunityIcons name="circle-small" size={20} color={colors.primary} />
@@ -533,7 +535,7 @@ export default function DiseaseScanScreen({
                 {/* Causes */}
                 {scanResult.causes ? (
                   <View style={styles.resultSection}>
-                    <Text style={styles.resultSectionTitle}>Causes</Text>
+                    <Text style={styles.resultSectionTitle}>{t('disease.causes')}</Text>
                     <Text style={styles.resultBulletText}>{scanResult.causes}</Text>
                   </View>
                 ) : null}
@@ -541,7 +543,7 @@ export default function DiseaseScanScreen({
                 {/* Treatment */}
                 {scanResult.treatment_recommendations ? (
                   <View style={styles.resultSection}>
-                    <Text style={styles.resultSectionTitle}>Treatment</Text>
+                    <Text style={styles.resultSectionTitle}>{t('disease.treatment')}</Text>
                     <Text style={styles.resultBulletText}>{scanResult.treatment_recommendations}</Text>
                   </View>
                 ) : null}
@@ -549,7 +551,7 @@ export default function DiseaseScanScreen({
                 {/* Prevention */}
                 {scanResult.prevention_tips.length > 0 && (
                   <View style={styles.resultSection}>
-                    <Text style={styles.resultSectionTitle}>Prevention</Text>
+                    <Text style={styles.resultSectionTitle}>{t('disease.prevention')}</Text>
                     {scanResult.prevention_tips.map((p: string, i: number) => (
                       <View key={i} style={styles.resultBulletRow}>
                         <MaterialCommunityIcons name="shield-check" size={18} color={colors.primary} />
@@ -589,7 +591,7 @@ export default function DiseaseScanScreen({
                   <MaterialCommunityIcons name="file-pdf-box" size={20} color={colors.primary} />
                 )}
                 <Text style={styles.downloadButtonText}>
-                  {isDownloadingReport ? 'Generating...' : 'Download Report'}
+                  {isDownloadingReport ? t('disease.generating') : t('disease.downloadReport')}
                 </Text>
               </Pressable>
             )}
@@ -597,7 +599,7 @@ export default function DiseaseScanScreen({
             {/* Scan again */}
             <Pressable style={styles.scanButton} onPress={handleReset}>
               <MaterialCommunityIcons name="camera" size={20} color={colors.onPrimary} />
-              <Text style={styles.scanButtonText}>Scan Another</Text>
+              <Text style={styles.scanButtonText}>{t('disease.scanAnother')}</Text>
             </Pressable>
           </View>
         )}
@@ -606,19 +608,19 @@ export default function DiseaseScanScreen({
         {scanPhase === 'error' && (
           <View style={styles.errorContainer}>
             <MaterialCommunityIcons name="alert-circle-outline" size={56} color="#E53935" />
-            <Text style={styles.errorTitle}>Analysis Failed</Text>
+            <Text style={styles.errorTitle}>{t('disease.analysisFailed')}</Text>
             <Text style={styles.errorMessage}>{errorMessage}</Text>
             {errorCode !== 'NETWORK_ERROR' && errorCode !== 'TIMEOUT' && (
-              <Text style={styles.errorCode}>Error: {errorCode}</Text>
+              <Text style={styles.errorCode}>{t('common.error')}: {errorCode}</Text>
             )}
             <Pressable style={styles.scanButton} onPress={selectedImage ? handleScan : handleReset}>
               <MaterialCommunityIcons name="refresh" size={20} color={colors.onPrimary} />
               <Text style={styles.scanButtonText}>
-                {selectedImage ? 'Try Again' : 'Scan Again'}
+                {selectedImage ? t('common.tryAgain') : t('disease.scanAgain')}
               </Text>
             </Pressable>
             <Pressable style={styles.retakeButton} onPress={handleReset}>
-              <Text style={styles.retakeButtonText}>Go Back</Text>
+              <Text style={styles.retakeButtonText}>{t('common.goBack')}</Text>
             </Pressable>
           </View>
         )}
@@ -626,7 +628,7 @@ export default function DiseaseScanScreen({
 
       {/* Bottom Navigation */}
       <View style={styles.bottomNav}>
-        {bottomTabs.map((tab) => {
+        {BOTTOM_TABS.map((tab) => {
           const isActive = bottomActive === tab.key;
           return (
             <Pressable
@@ -655,7 +657,7 @@ export default function DiseaseScanScreen({
                   isActive ? styles.navLabelActive : styles.navLabelInactive,
                 ]}
               >
-                {tab.label}
+                {t(tab.labelKey)}
               </Text>
             </Pressable>
           );

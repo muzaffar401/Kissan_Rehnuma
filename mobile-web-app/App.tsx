@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { View, I18nManager } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { colors } from './src/theme/colors';
 import { tokenStorage } from './src/services/tokenStorage';
+import i18n, { isRTL } from './src/i18n';
 import SplashScreenView from './src/screens/SplashScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import LanguageSelectionScreen from './src/screens/LanguageSelectionScreen';
@@ -36,6 +37,17 @@ export default function App() {
         await SplashScreen.hideAsync();
       } catch {
         // Safe to ignore on web
+      }
+
+      // Load saved language preference and apply it
+      const savedLang = await tokenStorage.getLanguage();
+      if (savedLang) {
+        await i18n.changeLanguage(savedLang);
+        // Sync RTL layout direction for Urdu/Sindhi
+        const rtl = isRTL(savedLang);
+        if (I18nManager.isRTL !== rtl) {
+          I18nManager.forceRTL(rtl);
+        }
       }
 
       const hasValidToken = await tokenStorage.isTokenValid();

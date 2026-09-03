@@ -1,12 +1,12 @@
 """LLM-powered agricultural advisory generation via OpenRouter (Gemini).
 
-Generates context-aware Roman-Urdu advisories using:
+Generates context-aware advisories in the user's selected language using:
 - Current weather conditions (temperature, rain, wind, humidity)
 - Hourly forecast summary (next 24-48h: min/max temp, total rain, peak wind)
 - Detected risk type with details
 
 Falls back to None when the API key is missing or the call fails —
-the caller then uses static Roman-Urdu advisories from advisories.py.
+the caller then uses static advisories from advisories.py.
 """
 import logging
 from pathlib import Path
@@ -26,6 +26,37 @@ from app.services.risk_engine import RiskResult
 from app.services.weather_provider import CurrentWeather, ForecastHour
 
 logger = logging.getLogger("weather_alert.llm")
+
+# Language → instruction appended to the SYSTEM PROMPT so the LLM responds in the right language.
+# Enterprise pattern: output language specification must be explicit in the system prompt.
+# For English we need extra reinforcement because the "Pakistani farmer" persona
+# strongly biases the model toward Roman Urdu.
+_LANG_RULES: dict[str, str] = {
+    "en": (
+        "\n\nIMPORTANT — OUTPUT LANGUAGE: ENGLISH ONLY.\n"
+        "You MUST write the ENTIRE advisory in English. Do NOT use Roman Urdu, Hindi, "
+        "Urdu, or any other language. Every single sentence must be in English.\n"
+        "Example of correct English output: 'Light rain of 0.8 mm is expected in the next "
+        "48 hours. Water your crops early morning or late evening. Avoid spraying pesticides "
+        "today as wind speed may reach 14 km/h. Keep livestock in shade and provide clean water.'"
+    ),
+    "ur": (
+        "\n\nIMPORTANT — OUTPUT LANGUAGE: Urdu (اردو — Arabic/Urdu script, NOT Roman).\n"
+        "You MUST write the ENTIRE advisory in Urdu using Arabic/Urdu script (Nastaliq style).\n"
+        "Do NOT use Roman Urdu or English letters. Write like: 'آج شام کو فصل کو پانی دیں'\n"
+        "No English words except technical terms like 'frost', 'heatwave', 'drainage', 'spray'."
+    ),
+    "sd": (
+        "\n\nOUTPUT LANGUAGE: Sindhi (سنڌي رسم الخط — Arabic/Sindhi script, NOT Roman).\n"
+        "Write ONLY in Sindhi using Arabic/Sindhi script. "
+        "Use simple words a farmer can easily understand."
+    ),
+}
+
+
+def _inject_lang_rules(system_prompt: str, lang: str) -> str:
+    """Append language-specific output rules to the system prompt."""
+    return system_prompt + _LANG_RULES.get(lang, _LANG_RULES["ur"])
 
 _PROMPT_PATH = (
     Path(__file__).resolve().parents[1]
@@ -79,13 +110,16 @@ def generate_advisory(
     risk: RiskResult,
     current: CurrentWeather,
     forecast: Optional[List[ForecastHour]] = None,
+    lang: str = "ur",
 ) -> Optional[str]:
     """Ask the LLM for a localized advisory; None means use the fallback."""
     if not OPENROUTER_API_KEY:
         logger.debug("No OPENROUTER_API_KEY configured, skipping LLM advisory")
         return None
 
-    system_prompt = _PROMPT_PATH.read_text(encoding="utf-8")
+    system_prompt = _inject_lang_rules(
+        _PROMPT_PATH.read_text(encoding="utf-8"), lang
+    )
 
     forecast_summary = (
         _build_forecast_summary(forecast) if forecast else "No forecast data."
@@ -105,6 +139,11 @@ def generate_advisory(
         f"\n"
         f"Generate a short, actionable advisory for the farmer."
     )
+
+    if lang == "en":
+        user_prompt += "\n\nIMPORTANT: Write your ENTIRE response in English only."
+    elif lang == "ur":
+        user_prompt += "\n\nاہم: اپنا پورا جواب اردو رسم الخط میں لکھیں۔ رومن اردو استعمال نہ کریں۔"
 
     try:
         response = httpx.post(
@@ -148,6 +187,7 @@ def generate_advisory(
 def generate_general_advisory(
     current: CurrentWeather,
     forecast: Optional[List[ForecastHour]] = None,
+    lang: str = "ur",
 ) -> Optional[str]:
     """Generate general weather-based farming advice via LLM.
 
@@ -159,7 +199,9 @@ def generate_general_advisory(
         logger.debug("No OPENROUTER_API_KEY configured, skipping general advisory")
         return None
 
-    system_prompt = _GENERAL_PROMPT_PATH.read_text(encoding="utf-8")
+    system_prompt = _inject_lang_rules(
+        _GENERAL_PROMPT_PATH.read_text(encoding="utf-8"), lang
+    )
     forecast_summary = (
         _build_forecast_summary(forecast) if forecast else "No forecast data."
     )
@@ -176,6 +218,13 @@ def generate_general_advisory(
         f"\n"
         f"Generate practical farming advice for the next 24-48 hours."
     )
+
+    # Dual reinforcement: add language reminder to user prompt for languages
+    # the model tends to ignore (English when persona is Pakistani farmer).
+    if lang == "en":
+        user_prompt += "\n\nIMPORTANT: Write your ENTIRE response in English only."
+    elif lang == "ur":
+        user_prompt += "\n\nاہم: اپنا پورا جواب اردو رسم الخط میں لکھیں۔ رومن اردو استعمال نہ کریں۔"
 
     try:
         response = httpx.post(
@@ -204,7 +253,7 @@ def generate_general_advisory(
             logger.warning("LLM returned empty general advisory")
             return None
 
-        logger.info("llm_general_advisory_generated", length=len(text))
+        logger.info("llm_general_advisory_generated", lang=lang, length=len(text), preview=text[:120])
         return text
 
     except (httpx.HTTPError, KeyError, ValueError, TypeError) as exc:

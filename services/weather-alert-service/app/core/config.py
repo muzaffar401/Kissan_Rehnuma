@@ -16,8 +16,8 @@ HTTP_TIMEOUT_SECONDS = float(os.getenv("HTTP_TIMEOUT_SECONDS", "15"))
 # Current weather readings younger than this are served from DB cache
 WEATHER_CACHE_MINUTES = int(os.getenv("WEATHER_CACHE_MINUTES", "30"))
 
-# How far ahead the forecast endpoint looks (24-48h)
-FORECAST_HOURS = int(os.getenv("FORECAST_HOURS", "48"))
+# How far ahead the forecast endpoint looks (up to 7 days = 168h)
+FORECAST_HOURS = int(os.getenv("FORECAST_HOURS", "168"))
 
 # Background scheduler: re-checks every farmer for weather risks
 SCHEDULER_ENABLED = os.getenv("SCHEDULER_ENABLED", "true").lower() == "true"
@@ -49,3 +49,4 @@ HIGH_WIND_KMH = float(os.getenv("HIGH_WIND_KMH", "40"))
 # When not configured, push messages are logged only.
 FCM_PROJECT_ID = os.getenv("FCM_PROJECT_ID", "")
 FCM_SERVICE_ACCOUNT_FILE = os.getenv("FCM_SERVICE_ACCOUNT_FILE", "")
+

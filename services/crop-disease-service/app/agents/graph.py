@@ -95,9 +95,9 @@ async def detect_disease(state: DiagnosisState) -> dict:
 
     language_label = {
         "en": "English",
-        "ur": "Urdu (Roman Urdu)",
+        "ur": "Urdu (اردو — Arabic/Urdu script, NOT Roman Urdu)",
         "pa": "Punjabi",
-        "sd": "Sindhi",
+        "sd": "Sindhi (سنڌي — Arabic/Sindhi script, NOT Roman)",
     }.get(language, "English")
 
     # Combine system prompt + language instruction into one message

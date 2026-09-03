@@ -25,11 +25,13 @@ import {
   BeVietnamPro_600SemiBold,
 } from '@expo-google-fonts/be-vietnam-pro';
 import { colors } from '../theme/colors';
+import { useTranslation } from 'react-i18next';
 import { tokenStorage } from '../services/tokenStorage';
 import { weatherService } from '../services/weatherService';
 import type { CurrentWeatherResponse, AdvisoryResponse } from '../services/weatherService';
 import { marketService } from '../services/marketService';
 import type { TrendEntry } from '../services/marketService';
+import { translateCropName } from '../services/cropTranslations';
 
 type TabKey = 'home' | 'disease' | 'weather' | 'market' | 'helpline';
 
@@ -39,55 +41,35 @@ interface HomeDashboardProps {
 
 type IconName = typeof MaterialCommunityIcons extends React.ComponentType<{ name: infer N }> ? N : string;
 
-const navTabs: { key: TabKey; icon: any; label: string }[] = [
-  { key: 'home', icon: 'home', label: 'Home' },
-  { key: 'disease', icon: 'leaf', label: 'Disease' },
-  { key: 'weather', icon: 'weather-sunny', label: 'Weather' },
-  { key: 'market', icon: 'tag', label: 'Market' },
-  { key: 'helpline', icon: 'phone', label: 'Helpline' },
+type NavTab = { key: TabKey; icon: any; labelKey: string };
+const NAV_TABS: NavTab[] = [
+  { key: 'home', icon: 'home', labelKey: 'common.nav.home' },
+  { key: 'disease', icon: 'leaf', labelKey: 'common.nav.disease' },
+  { key: 'weather', icon: 'weather-sunny', labelKey: 'common.nav.weather' },
+  { key: 'market', icon: 'tag', labelKey: 'common.nav.market' },
+  { key: 'helpline', icon: 'phone', labelKey: 'common.nav.helpline' },
 ];
 
-const featureCards = [
-  {
-    id: 'crop',
-    title: 'Crop Disease',
-    subtitle: 'Scan Crop',
-    image: require('../../assets/onboarding_crop.jpg'),
-    isImage: true,
-  },
-  {
-    id: 'animal',
-    title: 'Animal Disease',
-    subtitle: 'Scan Animal',
-    iconName: 'cow' as any,
-    isImage: false,
-  },
-  {
-    id: 'market',
-    title: 'Market Rates',
-    subtitle: 'Market Rates',
-    image: require('../../assets/onboarding_market.jpg'),
-    isImage: true,
-  },
-  {
-    id: 'helpline',
-    title: 'Helpline',
-    subtitle: 'Call Helpline',
-    image: require('../../assets/onboarding_helpline.png'),
-    isImage: true,
-    isUrgent: true,
-  },
+type FeatureCard = {
+  id: string; titleKey: string; subtitleKey: string;
+  image?: any; iconName?: any; isImage: boolean; isUrgent?: boolean;
+};
+const FEATURE_CARDS: FeatureCard[] = [
+  { id: 'crop', titleKey: 'dashboard.cropDisease', subtitleKey: 'dashboard.scanCrop', image: require('../../assets/onboarding_crop.jpg'), isImage: true },
+  { id: 'animal', titleKey: 'dashboard.animalDisease', subtitleKey: 'dashboard.scanAnimal', iconName: 'cow' as any, isImage: false },
+  { id: 'market', titleKey: 'dashboard.marketRates', subtitleKey: 'dashboard.marketRates', image: require('../../assets/onboarding_market.jpg'), isImage: true },
+  { id: 'helpline', titleKey: 'dashboard.callHelpline', subtitleKey: 'dashboard.callHelpline', image: require('../../assets/onboarding_helpline.png'), isImage: true, isUrgent: true },
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────
 
-function getGreeting(): string {
+function getGreetingKey(): string {
   const h = new Date().getHours();
-  if (h < 5) return 'Good Night';
-  if (h < 12) return 'Good Morning';
-  if (h < 17) return 'Good Afternoon';
-  if (h < 21) return 'Good Evening';
-  return 'Good Night';
+  if (h < 5) return 'dashboard.goodNight';
+  if (h < 12) return 'dashboard.goodMorning';
+  if (h < 17) return 'dashboard.goodAfternoon';
+  if (h < 21) return 'dashboard.goodEvening';
+  return 'dashboard.goodNight';
 }
 
 function formatDate(): string {
@@ -107,13 +89,13 @@ function getWeatherIcon(rain: number, wind: number, temp: number): string {
   return 'weather-partly-cloudy';
 }
 
-function getWeatherCondition(rain: number, wind: number, temp: number): string {
-  if (rain > 5) return 'Heavy Rain';
-  if (rain > 1) return 'Light Rain';
-  if (wind > 30) return 'Windy';
-  if (temp > 35) return 'Hot & Sunny';
-  if (temp > 28) return 'Sunny';
-  return 'Partly Cloudy';
+function getWeatherConditionKey(rain: number, wind: number, temp: number): string {
+  if (rain > 5) return 'dashboard.weatherHeavyRain';
+  if (rain > 1) return 'dashboard.weatherLightRain';
+  if (wind > 30) return 'dashboard.weatherWindy';
+  if (temp > 35) return 'dashboard.weatherHotSunny';
+  if (temp > 28) return 'dashboard.weatherSunny';
+  return 'dashboard.weatherPartlyCloudy';
 }
 
 function getTrendIcon(direction: string): string {
@@ -137,6 +119,7 @@ function getTrendColor(direction: string): string {
 // ── Component ──────────────────────────────────────────────────────
 
 export default function HomeDashboard({ onNavigate }: HomeDashboardProps) {
+  const { t, i18n } = useTranslation();
   const { width } = useWindowDimensions();
   const [activeTab, setActiveTab] = useState<TabKey>('home');
   const [fontsLoaded] = useFonts({
@@ -173,7 +156,7 @@ export default function HomeDashboard({ onNavigate }: HomeDashboardProps) {
         // Fetch weather + advisory + trending in parallel
         const [weatherData, advisoryData, trendingData] = await Promise.allSettled([
           weatherService.getCurrentWeather(farmerId),
-          weatherService.getAdvisory(farmerId),
+          weatherService.getAdvisory(farmerId, i18n.language),
           marketService.getTrending(7),
         ]);
 
@@ -244,7 +227,7 @@ export default function HomeDashboard({ onNavigate }: HomeDashboardProps) {
             color={colors.onSurfaceVariant}
           />
         </Pressable>
-        <Text style={styles.appBarTitle}>Kissan Rehnuma</Text>
+        <Text style={styles.appBarTitle}>{t('common.appName')}</Text>
         <Pressable style={styles.appBarButton} onPress={() => onNavigate?.('settings')}>
           <MaterialCommunityIcons
             name="account-circle"
@@ -269,9 +252,9 @@ export default function HomeDashboard({ onNavigate }: HomeDashboardProps) {
         {/* Greeting */}
         <View style={styles.greetingSection}>
           <Text style={styles.greetingName}>
-            Hello{userName ? `, ${userName}` : ''}
+            {userName ? t('dashboard.helloName', { name: userName }) : t('dashboard.hello')}
           </Text>
-          <Text style={styles.greetingTime}>{getGreeting()}</Text>
+          <Text style={styles.greetingTime}>{t(getGreetingKey())}</Text>
           <Text style={styles.greetingDate}>{formatDate()}</Text>
         </View>
 
@@ -294,7 +277,7 @@ export default function HomeDashboard({ onNavigate }: HomeDashboardProps) {
                 <View style={styles.weatherTempRow}>
                   <Text style={styles.weatherTemp}>{Math.round(weather.temperature)}°C</Text>
                   <Text style={styles.weatherCondition}>
-                    {getWeatherCondition(weather.rain_mm, weather.wind_speed_kmh, weather.temperature)}
+                    {t(getWeatherConditionKey(weather.rain_mm, weather.wind_speed_kmh, weather.temperature))}
                   </Text>
                 </View>
                 <Text style={styles.weatherDesc} numberOfLines={2}>
@@ -302,9 +285,9 @@ export default function HomeDashboard({ onNavigate }: HomeDashboardProps) {
                     ? advisory.advice.length > 80
                       ? advisory.advice.slice(0, 80) + '...'
                       : advisory.advice
-                    : `Humidity ${weather.humidity}% · Wind ${weather.wind_speed_kmh} km/h`}
+                    : t('dashboard.humidityWind', { humidity: weather.humidity, wind: weather.wind_speed_kmh })}
                 </Text>
-                <Text style={styles.weatherTapHint}>Tap for details →</Text>
+                <Text style={styles.weatherTapHint}>{t('dashboard.tapForDetails')}</Text>
               </View>
             </View>
           </Pressable>
@@ -315,9 +298,9 @@ export default function HomeDashboard({ onNavigate }: HomeDashboardProps) {
                 <MaterialCommunityIcons name="weather-sunny" size={40} color={colors.onSecondaryContainer} />
               </View>
               <View style={styles.weatherInfo}>
-                <Text style={styles.weatherCondition}>Weather unavailable</Text>
-                <Text style={styles.weatherDesc}>Make sure your location is registered</Text>
-                <Text style={styles.weatherTapHint}>Tap to retry →</Text>
+                <Text style={styles.weatherCondition}>{t('dashboard.weatherUnavailable')}</Text>
+                <Text style={styles.weatherDesc}>{t('dashboard.weatherLocationHint')}</Text>
+                <Text style={styles.weatherTapHint}>{t('dashboard.tapToRetry')}</Text>
               </View>
             </View>
           </Pressable>
@@ -327,26 +310,26 @@ export default function HomeDashboard({ onNavigate }: HomeDashboardProps) {
         {trending.length > 0 && (
           <View style={styles.sectionContainer}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Market Trends</Text>
+              <Text style={styles.sectionTitle}>{t('dashboard.marketTrends')}</Text>
               <Pressable onPress={() => onNavigate?.('market')}>
-                <Text style={styles.sectionLink}>View All</Text>
+                <Text style={styles.sectionLink}>{t('dashboard.viewAll')}</Text>
               </Pressable>
             </View>
             <View style={styles.trendRow}>
-              {trending.map((t) => (
-                <View key={t.crop} style={styles.trendItem}>
-                  <Text style={styles.trendCrop} numberOfLines={1}>{t.crop}</Text>
+              {trending.map((trend) => (
+                <View key={trend.crop} style={styles.trendItem}>
+                  <Text style={styles.trendCrop} numberOfLines={1}>{translateCropName(t, trend.crop)}</Text>
                   <View style={styles.trendPriceRow}>
-                    <Text style={styles.trendPrice}>Rs {Math.round(t.current_avg)}/kg</Text>
+                    <Text style={styles.trendPrice}>Rs {Math.round(trend.current_avg)}/kg</Text>
                     <MaterialCommunityIcons
-                      name={getTrendIcon(t.direction) as any}
+                      name={getTrendIcon(trend.direction) as any}
                       size={16}
-                      color={getTrendColor(t.direction)}
+                      color={getTrendColor(trend.direction)}
                     />
                   </View>
-                  {t.change_percent != null && (
-                    <Text style={[styles.trendChange, { color: getTrendColor(t.direction) }]}>
-                      {t.direction === 'up' ? '▲' : t.direction === 'down' ? '▼' : '—'} {Math.abs(Math.round(t.change_percent))}%
+                  {trend.change_percent != null && (
+                    <Text style={[styles.trendChange, { color: getTrendColor(trend.direction) }]}>
+                      {trend.direction === 'up' ? '▲' : trend.direction === 'down' ? '▼' : '—'} {Math.abs(Math.round(trend.change_percent))}%
                     </Text>
                   )}
                 </View>
@@ -357,7 +340,7 @@ export default function HomeDashboard({ onNavigate }: HomeDashboardProps) {
 
         {/* Feature Grid */}
         <View style={[styles.featureGrid, isWide && styles.featureGridWide]}>
-          {featureCards.map((card) => (
+          {FEATURE_CARDS.map((card) => (
             <Pressable
               key={card.id}
               style={[
@@ -370,7 +353,7 @@ export default function HomeDashboard({ onNavigate }: HomeDashboardProps) {
               {/* Urgent badge */}
               {card.isUrgent && (
                 <View style={styles.urgentBadge}>
-                  <Text style={styles.urgentText}>URGENT</Text>
+                  <Text style={styles.urgentText}>{t('dashboard.urgent')}</Text>
                 </View>
               )}
 
@@ -402,7 +385,7 @@ export default function HomeDashboard({ onNavigate }: HomeDashboardProps) {
                     card.isUrgent && styles.cardTitleUrgent,
                   ]}
                 >
-                  {card.title}
+                  {t(card.titleKey)}
                 </Text>
                 <Text
                   style={[
@@ -410,7 +393,7 @@ export default function HomeDashboard({ onNavigate }: HomeDashboardProps) {
                     card.isUrgent && styles.cardSubtitleUrgent,
                   ]}
                 >
-                  {card.subtitle}
+                  {t(card.subtitleKey)}
                 </Text>
               </View>
             </Pressable>
@@ -420,7 +403,7 @@ export default function HomeDashboard({ onNavigate }: HomeDashboardProps) {
 
       {/* Bottom Navigation Bar */}
       <View style={styles.bottomNav}>
-        {navTabs.map((tab) => {
+        {NAV_TABS.map((tab) => {
           const isActive = activeTab === tab.key;
           return (
             <Pressable
@@ -442,7 +425,7 @@ export default function HomeDashboard({ onNavigate }: HomeDashboardProps) {
                   isActive ? styles.navLabelActive : styles.navLabelInactive,
                 ]}
               >
-                {tab.label}
+                {t(tab.labelKey)}
               </Text>
             </Pressable>
           );

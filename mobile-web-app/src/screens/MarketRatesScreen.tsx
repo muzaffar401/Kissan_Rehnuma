@@ -24,7 +24,9 @@ import {
   BeVietnamPro_600SemiBold,
 } from '@expo-google-fonts/be-vietnam-pro';
 import { colors } from '../theme/colors';
+import { useTranslation } from 'react-i18next';
 import { marketService, type CropPrice } from '../services/marketService';
+import { CROP_NAME_KEYS } from '../services/cropTranslations';
 
 type BottomTab = 'home' | 'disease' | 'weather' | 'market' | 'helpline';
 
@@ -32,29 +34,29 @@ interface MarketRatesScreenProps {
   onNavigate?: (screen: string) => void;
 }
 
-const bottomTabs: { key: BottomTab; icon: string; label: string }[] = [
-  { key: 'home', icon: 'home', label: 'Home' },
-  { key: 'disease', icon: 'leaf', label: 'Disease' },
-  { key: 'weather', icon: 'weather-sunny', label: 'Weather' },
-  { key: 'market', icon: 'tag', label: 'Market' },
-  { key: 'helpline', icon: 'phone', label: 'Helpline' },
+const BOTTOM_TABS: { key: BottomTab; icon: string; labelKey: string }[] = [
+  { key: 'home', icon: 'home', labelKey: 'common.nav.home' },
+  { key: 'disease', icon: 'leaf', labelKey: 'common.nav.disease' },
+  { key: 'weather', icon: 'weather-sunny', labelKey: 'common.nav.weather' },
+  { key: 'market', icon: 'tag', labelKey: 'common.nav.market' },
+  { key: 'helpline', icon: 'phone', labelKey: 'common.nav.helpline' },
 ];
 
-const filterChips = [
-  'All',
-  'Grains',
-  'Vegetables',
-  'Fruits',
+const FILTER_CHIPS = [
+  { label: 'market.all', value: 'All' },
+  { label: 'market.grains', value: 'market.grains' },
+  { label: 'market.vegetables', value: 'market.vegetables' },
+  { label: 'market.fruits', value: 'market.fruits' },
 ];
 
-// Categorize crop by name for filter chips
+// Categorize crop by name for filter chips — returns i18n key
 function categorize(name: string): string {
   const n = name.toLowerCase();
   const fruits = ['apple', 'banana', 'guava', 'orange', 'kinnow', 'mango', 'melon', 'watermelon', 'lychee', 'strawberry', 'dates', 'lemon', 'peach', 'plum', 'pear', 'musambi', 'grapefruit', 'grapes', 'apricot', 'pomegranate', 'sweet musk', 'jujube', 'coconut', 'papaya', 'loquat', 'persimmon', 'jaman', 'feutral'];
   const grains = ['wheat', 'rice', 'maize', 'millet', 'sorghum', 'barley', 'sugar', 'jaggery', 'sugarcane', 'cotton', 'gram', 'moong', 'mash', 'masoor', 'rapeseed', 'canola', 'sunflower', 'sesame', 'mustard seed', 'groundnut', 'red chilli', 'banola', 'fodder', 'straw'];
-  if (fruits.some(f => n.includes(f))) return 'Fruits';
-  if (grains.some(g => n.includes(g))) return 'Grains';
-  return 'Vegetables';
+  if (fruits.some(f => n.includes(f))) return 'market.fruits';
+  if (grains.some(g => n.includes(g))) return 'market.grains';
+  return 'market.vegetables';
 }
 
 // Map crop name to MaterialCommunityIcons icon
@@ -87,6 +89,7 @@ function formatPrice(price: number | null): string {
 }
 
 export default function MarketRatesScreen({ onNavigate }: MarketRatesScreenProps) {
+  const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const [bottomActive, setBottomActive] = useState<BottomTab>('market');
   const [searchQuery, setSearchQuery] = useState('');
@@ -126,7 +129,7 @@ export default function MarketRatesScreen({ onNavigate }: MarketRatesScreenProps
         if (!cancelled) {
           const msg = err && typeof err === 'object' && 'detail' in err
             ? (err as { detail: string }).detail
-            : 'Failed to load market rates';
+            : t('market.failedLoad');
           setError(msg);
         }
       } finally {
@@ -170,7 +173,7 @@ export default function MarketRatesScreen({ onNavigate }: MarketRatesScreenProps
             color={colors.onSurfaceVariant}
           />
         </Pressable>
-        <Text style={styles.appBarTitle}>Kissan Rehnuma</Text>
+        <Text style={styles.appBarTitle}>{t('common.appName')}</Text>
         <Pressable style={styles.appBarBtn}>
           <MaterialCommunityIcons
             name="account-circle"
@@ -198,14 +201,14 @@ export default function MarketRatesScreen({ onNavigate }: MarketRatesScreenProps
             resizeMode="cover"
           />
           <View style={styles.headerGradient} />
-          <Text style={styles.headerTitle}>Market Rates</Text>
+          <Text style={styles.headerTitle}>{t('market.title')}</Text>
         </View>
 
         {/* Date badge */}
         {recordedDate && (
           <View style={styles.dateBadge}>
             <MaterialCommunityIcons name="calendar-today" size={14} color={colors.onSurfaceVariant} />
-            <Text style={styles.dateText}>Rates as of {recordedDate}</Text>
+            <Text style={styles.dateText}>{t('market.ratesAsOf', { date: recordedDate })}</Text>
           </View>
         )}
 
@@ -219,7 +222,7 @@ export default function MarketRatesScreen({ onNavigate }: MarketRatesScreenProps
           />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search crops or markets..."
+            placeholder={t('market.searchPlaceholder')}
             placeholderTextColor={colors.onSurfaceVariant}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -234,18 +237,18 @@ export default function MarketRatesScreen({ onNavigate }: MarketRatesScreenProps
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chipsScroll}
         >
-          {filterChips.map((chip) => {
-            const isActive = activeChip === chip;
+          {FILTER_CHIPS.map((chip) => {
+            const isActive = activeChip === chip.value;
             return (
               <Pressable
-                key={chip}
+                key={chip.value}
                 style={[styles.chip, isActive && styles.chipActive]}
-                onPress={() => setActiveChip(chip)}
+                onPress={() => setActiveChip(chip.value)}
               >
                 <Text
                   style={[styles.chipText, isActive && styles.chipTextActive]}
                 >
-                  {chip}
+                  {t(chip.label)}
                 </Text>
               </Pressable>
             );
@@ -256,7 +259,7 @@ export default function MarketRatesScreen({ onNavigate }: MarketRatesScreenProps
         {loading && (
           <View style={styles.centerState}>
             <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.centerText}>Loading mandi rates...</Text>
+            <Text style={styles.centerText}>{t('market.loadingRates')}</Text>
           </View>
         )}
 
@@ -266,7 +269,7 @@ export default function MarketRatesScreen({ onNavigate }: MarketRatesScreenProps
             <MaterialCommunityIcons name="alert-circle" size={48} color={colors.error} />
             <Text style={styles.centerText}>{error}</Text>
             <Pressable style={styles.retryBtn} onPress={() => {}}>
-              <Text style={styles.retryText}>Retry</Text>
+              <Text style={styles.retryText}>{t('market.retry')}</Text>
             </Pressable>
           </View>
         )}
@@ -275,7 +278,10 @@ export default function MarketRatesScreen({ onNavigate }: MarketRatesScreenProps
         {!loading && !error && (
           <>
             <Text style={styles.resultsCount}>
-              {filteredCrops.length} items{activeChip !== 'All' ? ` in ${activeChip}` : ''}
+              {activeChip !== 'All'
+                ? t('market.itemsInCategory', { count: filteredCrops.length, category: t(activeChip) })
+                : t('market.itemsCount', { count: filteredCrops.length })
+              }
             </Text>
             <View style={styles.cardsGrid}>
               {filteredCrops.map((item) => (
@@ -294,7 +300,7 @@ export default function MarketRatesScreen({ onNavigate }: MarketRatesScreenProps
                         />
                       </View>
                       <View style={styles.cardInfo}>
-                        <Text style={styles.cardName} numberOfLines={1}>{item.crop_name}</Text>
+                        <Text style={styles.cardName} numberOfLines={1}>{t(CROP_NAME_KEYS[item.crop_name] || '', { defaultValue: item.crop_name })}</Text>
                         <View style={styles.cardMandiRow}>
                           <MaterialCommunityIcons
                             name="map-marker"
@@ -308,12 +314,12 @@ export default function MarketRatesScreen({ onNavigate }: MarketRatesScreenProps
                     {/* Category badge */}
                     <View style={[
                       styles.categoryBadge,
-                      categorize(item.crop_name) === 'Grains' && styles.catGrains,
-                      categorize(item.crop_name) === 'Vegetables' && styles.catVegetables,
-                      categorize(item.crop_name) === 'Fruits' && styles.catFruits,
+                      categorize(item.crop_name) === 'market.grains' && styles.catGrains,
+                      categorize(item.crop_name) === 'market.vegetables' && styles.catVegetables,
+                      categorize(item.crop_name) === 'market.fruits' && styles.catFruits,
                     ]}>
                       <Text style={styles.categoryText}>
-                        {categorize(item.crop_name)}
+                        {t(categorize(item.crop_name))}
                       </Text>
                     </View>
                   </View>
@@ -321,10 +327,10 @@ export default function MarketRatesScreen({ onNavigate }: MarketRatesScreenProps
                   {/* Divider + Price */}
                   <View style={styles.cardBottom}>
                     <View>
-                      <Text style={styles.cardUnit}>FQP Price/kg</Text>
+                      <Text style={styles.cardUnit}>{t('market.fqpPrice')}</Text>
                       {item.min_price !== null && item.max_price !== null && (
                         <Text style={styles.cardRange}>
-                          Min: {formatPrice(item.min_price)} — Max: {formatPrice(item.max_price)}
+                          {t('market.minMax', { min: formatPrice(item.min_price), max: formatPrice(item.max_price) })}
                         </Text>
                       )}
                     </View>
@@ -344,7 +350,7 @@ export default function MarketRatesScreen({ onNavigate }: MarketRatesScreenProps
                   size={48}
                   color={colors.outline}
                 />
-                <Text style={styles.emptyText}>No results found</Text>
+                <Text style={styles.emptyText}>{t('market.noResults')}</Text>
               </View>
             )}
           </>
@@ -353,7 +359,7 @@ export default function MarketRatesScreen({ onNavigate }: MarketRatesScreenProps
 
       {/* Bottom Navigation */}
       <View style={styles.bottomNav}>
-        {bottomTabs.map((tab) => {
+        {BOTTOM_TABS.map((tab) => {
           const isActive = bottomActive === tab.key;
           return (
             <Pressable
@@ -382,7 +388,7 @@ export default function MarketRatesScreen({ onNavigate }: MarketRatesScreenProps
                   isActive ? styles.navLabelActive : styles.navLabelInactive,
                 ]}
               >
-                {tab.label}
+                {t(tab.labelKey)}
               </Text>
             </Pressable>
           );

@@ -25,6 +25,7 @@ import {
   BeVietnamPro_600SemiBold,
 } from '@expo-google-fonts/be-vietnam-pro';
 import { colors } from '../theme/colors';
+import { useTranslation } from 'react-i18next';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -37,60 +38,29 @@ interface HelplineScreenProps {
   onNavigate?: (screen: string) => void;
 }
 
-const bottomTabs: { key: BottomTab; icon: string; label: string }[] = [
-  { key: 'home', icon: 'home', label: 'Home' },
-  { key: 'disease', icon: 'leaf', label: 'Disease' },
-  { key: 'weather', icon: 'weather-sunny', label: 'Weather' },
-  { key: 'market', icon: 'tag', label: 'Market' },
-  { key: 'helpline', icon: 'phone', label: 'Helpline' },
+const BOTTOM_TABS: { key: BottomTab; icon: string; labelKey: string }[] = [
+  { key: 'home', icon: 'home', labelKey: 'common.nav.home' },
+  { key: 'disease', icon: 'leaf', labelKey: 'common.nav.disease' },
+  { key: 'weather', icon: 'weather-sunny', labelKey: 'common.nav.weather' },
+  { key: 'market', icon: 'tag', labelKey: 'common.nav.market' },
+  { key: 'helpline', icon: 'phone', labelKey: 'common.nav.helpline' },
 ];
 
-const categories = [
-  {
-    id: '1',
-    title: 'Agricultural Experts',
-    description: 'Advice on crop diseases, fertilizers, and seeds',
-    icon: 'brain',
-  },
-  {
-    id: '2',
-    title: 'Livestock & Animals',
-    description: 'Advice on animal health and nutrition',
-    icon: 'paw-print',
-  },
-  {
-    id: '3',
-    title: 'Market Experts',
-    description: 'Advice on market rates and selling',
-    icon: 'storefront-outline',
-  },
-  {
-    id: '4',
-    title: 'App Support',
-    description: 'Assistance with using the app',
-    icon: 'cellphone',
-  },
+const CATEGORIES = [
+  { id: '1', titleKey: 'helpline.agriculturalExperts', descKey: 'helpline.agriculturalDesc', icon: 'brain' },
+  { id: '2', titleKey: 'helpline.livestockAnimals', descKey: 'helpline.livestockDesc', icon: 'paw-print' },
+  { id: '3', titleKey: 'helpline.marketExperts', descKey: 'helpline.marketDesc', icon: 'storefront-outline' },
+  { id: '4', titleKey: 'helpline.appSupport', descKey: 'helpline.appSupportDesc', icon: 'cellphone' },
 ];
 
-const faqs = [
-  {
-    id: '1',
-    question: 'What are the helpline hours?',
-    answer: 'Our helpline is available from 8 AM to 6 PM.',
-  },
-  {
-    id: '2',
-    question: 'Is there a fee for talking to experts?',
-    answer: 'No, consulting with our experts is absolutely free.',
-  },
-  {
-    id: '3',
-    question: 'What if my call is not answered?',
-    answer: 'You can message us on WhatsApp or try again after some time.',
-  },
+const FAQS = [
+  { id: '1', questionKey: 'helpline.faq1Question', answerKey: 'helpline.faq1Answer' },
+  { id: '2', questionKey: 'helpline.faq2Question', answerKey: 'helpline.faq2Answer' },
+  { id: '3', questionKey: 'helpline.faq3Question', answerKey: 'helpline.faq3Answer' },
 ];
 
 export default function HelplineScreen({ onNavigate }: HelplineScreenProps) {
+  const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const [bottomActive, setBottomActive] = useState<BottomTab>('helpline');
   const [openFaq, setOpenFaq] = useState<string | null>(null);
@@ -128,7 +98,7 @@ export default function HelplineScreen({ onNavigate }: HelplineScreenProps) {
             color={colors.primary}
           />
         </Pressable>
-        <Text style={styles.appBarTitle}>Kissan Rehnuma</Text>
+        <Text style={styles.appBarTitle}>{t('common.appName')}</Text>
         <Pressable style={styles.appBarBtn}>
           <MaterialCommunityIcons
             name="account-circle"
@@ -154,10 +124,9 @@ export default function HelplineScreen({ onNavigate }: HelplineScreenProps) {
             style={styles.heroImage}
             resizeMode="contain"
           />
-          <Text style={styles.heroTitle}>Contact Experts</Text>
+          <Text style={styles.heroTitle}>{t('helpline.contactExperts')}</Text>
           <Text style={styles.heroDescription}>
-            For any issues related to crops, animals, or market rates, our
-            experts are ready to assist you.
+            {t('helpline.heroDescription')}
           </Text>
           <Pressable
             style={styles.callNowBtn}
@@ -168,15 +137,15 @@ export default function HelplineScreen({ onNavigate }: HelplineScreenProps) {
               size={20}
               color={colors.onPrimary}
             />
-            <Text style={styles.callNowBtnText}>Call Now</Text>
+            <Text style={styles.callNowBtnText}>{t('helpline.callNow')}</Text>
           </Pressable>
         </View>
 
         {/* Contact Categories */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Contact Categories</Text>
+          <Text style={styles.sectionTitle}>{t('helpline.contactCategories')}</Text>
           <View style={styles.categoriesGrid}>
-            {categories.map((cat) => (
+            {CATEGORIES.map((cat) => (
               <Pressable
                 key={cat.id}
                 style={[
@@ -192,8 +161,8 @@ export default function HelplineScreen({ onNavigate }: HelplineScreenProps) {
                   />
                 </View>
                 <View style={styles.categoryInfo}>
-                  <Text style={styles.categoryTitle}>{cat.title}</Text>
-                  <Text style={styles.categoryDesc}>{cat.description}</Text>
+                  <Text style={styles.categoryTitle}>{t(cat.titleKey)}</Text>
+                  <Text style={styles.categoryDesc}>{t(cat.descKey)}</Text>
                 </View>
                 <Pressable
                   style={styles.categoryCallBtn}
@@ -212,8 +181,8 @@ export default function HelplineScreen({ onNavigate }: HelplineScreenProps) {
 
         {/* FAQ Section */}
         <View style={styles.faqSection}>
-          <Text style={styles.faqSectionTitle}>Common Questions</Text>
-          {faqs.map((faq) => {
+          <Text style={styles.faqSectionTitle}>{t('helpline.commonQuestions')}</Text>
+          {FAQS.map((faq) => {
             const isOpen = openFaq === faq.id;
             return (
               <View key={faq.id} style={styles.faqItem}>
@@ -221,7 +190,7 @@ export default function HelplineScreen({ onNavigate }: HelplineScreenProps) {
                   style={styles.faqHeader}
                   onPress={() => toggleFaq(faq.id)}
                 >
-                  <Text style={styles.faqQuestion}>{faq.question}</Text>
+                  <Text style={styles.faqQuestion}>{t(faq.questionKey)}</Text>
                   <Animated.View
                     style={{
                       transform: [
@@ -240,7 +209,7 @@ export default function HelplineScreen({ onNavigate }: HelplineScreenProps) {
                 </Pressable>
                 {isOpen && (
                   <View style={styles.faqAnswer}>
-                    <Text style={styles.faqAnswerText}>{faq.answer}</Text>
+                    <Text style={styles.faqAnswerText}>{t(faq.answerKey)}</Text>
                   </View>
                 )}
               </View>
@@ -251,7 +220,7 @@ export default function HelplineScreen({ onNavigate }: HelplineScreenProps) {
 
       {/* Bottom Navigation */}
       <View style={styles.bottomNav}>
-        {bottomTabs.map((tab) => {
+        {BOTTOM_TABS.map((tab) => {
           const isActive = bottomActive === tab.key;
           return (
             <Pressable
@@ -280,7 +249,7 @@ export default function HelplineScreen({ onNavigate }: HelplineScreenProps) {
                   isActive ? styles.navLabelActive : styles.navLabelInactive,
                 ]}
               >
-                {tab.label}
+                {t(tab.labelKey)}
               </Text>
             </Pressable>
           );
