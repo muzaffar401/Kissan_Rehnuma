@@ -49,6 +49,12 @@ class Settings(BaseSettings):
     uplift_voice_id: str = "v_8eelc901"  # Info/Edu voice
     uplift_output_format: str = "WAV_22050_16"
 
+    # Service-to-service (internal calls to other microservices)
+    weather_service_url: str = "http://localhost:8004"
+    market_rate_service_url: str = "http://localhost:8005"
+    jwt_secret_key: str = "change-this-secret-key"  # shared with all services
+    jwt_algorithm: str = "HS256"
+
     # Agent behavior
     agent_language: str = "ur"  # Urdu
     agent_max_complaints_per_session: int = 5

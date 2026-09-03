@@ -94,11 +94,13 @@ export const authService = {
     if (response.access_token) {
       await tokenStorage.saveAccessToken(response.access_token);
 
-      // Decode basic user info from JWT payload (sub = user_id)
+      // Decode basic user info from JWT payload (sub = user_id, name = farmer name)
       try {
         const payload = decodeJWTPayload(response.access_token);
+        console.log('[Auth] JWT decoded:', payload);
         if (payload.sub && payload.email) {
-          await tokenStorage.saveUserInfo(payload.sub, payload.email);
+          await tokenStorage.saveUserInfo(payload.sub, payload.email, payload.name);
+          console.log('[Auth] User info saved:', { userId: payload.sub, email: payload.email, name: payload.name });
         }
       } catch {
         // If decode fails, user info just won't be cached
@@ -190,7 +192,7 @@ export const authService = {
  * Decode JWT payload without verification (client-side only for display).
  * JWT format: header.payload.signature (base64url encoded)
  */
-function decodeJWTPayload(token: string): { sub?: string; email?: string } {
+function decodeJWTPayload(token: string): { sub?: string; email?: string; name?: string } {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return {};

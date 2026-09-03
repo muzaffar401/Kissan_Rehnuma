@@ -159,7 +159,10 @@ export default function HelplineScreen({ onNavigate }: HelplineScreenProps) {
             For any issues related to crops, animals, or market rates, our
             experts are ready to assist you.
           </Text>
-          <Pressable style={styles.callNowBtn}>
+          <Pressable
+            style={styles.callNowBtn}
+            onPress={() => onNavigate?.('voice-call')}
+          >
             <MaterialCommunityIcons
               name="phone"
               size={20}
@@ -192,7 +195,10 @@ export default function HelplineScreen({ onNavigate }: HelplineScreenProps) {
                   <Text style={styles.categoryTitle}>{cat.title}</Text>
                   <Text style={styles.categoryDesc}>{cat.description}</Text>
                 </View>
-                <Pressable style={styles.categoryCallBtn}>
+                <Pressable
+                  style={styles.categoryCallBtn}
+                  onPress={() => onNavigate?.('voice-call')}
+                >
                   <MaterialCommunityIcons
                     name="phone"
                     size={20}

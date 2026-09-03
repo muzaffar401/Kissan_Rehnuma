@@ -15,6 +15,7 @@ from app.services.sources.base import RawPrice
 CROP_SYNONYMS = {
     # ── Grains & Pulses ──
     "wheat": "Wheat",
+    "gandum": "Wheat",
     "rice basmati super (new)": "Rice Basmati Super (New)",
     "rice basmati super (old)": "Rice Basmati Super (Old)",
     "rice basmati (385)": "Rice Basmati (385)",
@@ -243,6 +244,73 @@ CROP_SYNONYMS = {
     "jaman": "Jaman",
     "feutral early(100 pcs) فروٹر": "Feutral Early",
     "feutral early": "Feutral Early",
+
+    # ── Urdu Script Synonyms ──────────────────────────────────────────────────
+    # Urdu script names that farmers/LLM might pass — mapped to standardized names.
+    # Vegetables
+    "آلو": "Potato Fresh",
+    "پیاز": "Onion",
+    "ٹماٹر": "Tomato",
+    "ٹماٹر": "Tomato",
+    "گاجر": "Carrot",
+    "کھیرا": "Cucumber",
+    "پالک": "Spinach",
+    "بینگن": "Brinjal",
+    "بھنڈی": "Lady Finger (Okra)",
+    "کریلا": "Bitter Gourd",
+    "گوبھی": "Cauliflower",
+    "پھول گوبھی": "Cauliflower",
+    "بند گوبھی": "Cabbage",
+    "مولی": "Radish",
+    "کدو": "Bottle Gourd",
+    "لوکی": "Bottle Gourd",
+    "مرچ": "Green Chilli",
+    "شملہ مرچ": "Capsicum",
+    "مٹر": "Peas",
+    "اروی": "Cocoyam",
+    "میتھی": "Fenugreek",
+    "دھنیا": "Coriander",
+    "ادرک": "Ginger (China)",
+    "لہسن": "Garlic (Local)",
+    "پودینہ": "Mint",
+    "ہلدی": "Turmeric",
+    "شکر قندی": "Sweet Potato",
+    "چقندر": "Sugar Beet",
+    "سنگھاڑا": "Water Chestnut",
+    "چھولیا": "Green Chickpeas",
+    # Fruits
+    "آم": "Mango (Chounsa)",
+    "سیب": "Apple (Gatcha)",
+    "انگور": "Grapes Gola",
+    "کیلا": "Banana (Dozen)",
+    "امرود": "Guava",
+    "آڑھو": "Peach",
+    "ناشپاتی": "Pear",
+    "چکوترا": "Grapefruit",
+    "خربوزہ": "Melon",
+    "تربز": "Watermelon",
+    "انار": "Pomegranate Desi",
+    "کھجور": "Dates (Aseel)",
+    "لیموں": "Lemon (Desi)",
+    "بیر": "Jujube",
+    "پپیتا": "Papaya",
+    "جاپانی پھل": "Persimmon",
+    # Grains & Pulses
+    "گندم": "Wheat",
+    "چاول": "Rice Basmati Super (New)",
+    "مکئی": "Maize",
+    "جوار": "Sorghum",
+    "باجرا": "Millet",
+    "چنے": "Gram White Bareek",
+    "مسور": "Masoor Whole (Local)",
+    "مونگ": "Moong",
+    "ماش": "Mash",
+    # Cash crops
+    "گنا": "Sugarcane",
+    "کپاس": "Seed Cotton",
+    "روئی": "Seed Cotton",
+    "سر سوں": "Rapeseed",
+    "تل": "Sesame",
 }
 
 # ─── Unit Divisors ────────────────────────────────────────────────────────────
@@ -270,8 +338,29 @@ class StandardPrice:
 
 
 def standardize_crop(raw: str) -> Optional[str]:
-    """Map a raw crop name to the standardized one; None if unknown."""
-    return CROP_SYNONYMS.get(raw.strip().lower())
+    """Map a raw crop name to the standardized one; None if unknown.
+
+    Resolution order:
+    1. Exact match in CROP_SYNONYMS (fast path)
+    2. Fuzzy match using rapidfuzz (handles typos, partial names, script variations)
+    3. Return None if no match found
+    """
+    raw_clean = raw.strip().lower()
+    # Fast path: exact match
+    exact = CROP_SYNONYMS.get(raw_clean)
+    if exact is not None:
+        return exact
+
+    # Fuzzy fallback: find closest match with score >= 80
+    try:
+        from rapidfuzz import process
+        match, score, _ = process.extractOne(raw_clean, CROP_SYNONYMS.keys())
+        if score >= 80:
+            return CROP_SYNONYMS[match]
+    except ImportError:
+        pass  # rapidfuzz not installed — skip fuzzy matching
+
+    return None
 
 
 def standardize(raw_records: List[RawPrice]) -> List[StandardPrice]:

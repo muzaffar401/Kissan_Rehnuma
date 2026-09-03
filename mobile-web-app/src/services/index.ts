@@ -58,4 +58,7 @@ export type {
   TrendEntry,
 } from './marketService';
 
-export { API_BASE_URL, GATEWAY_HEALTH, ENDPOINTS } from './config';
+export { fetchVoiceToken, generateRoomName } from './helplineService';
+export type { VoiceTokenResponse } from './helplineService';
+
+export { API_BASE_URL, GATEWAY_HEALTH, ENDPOINTS, TOKEN_SERVER_URL, LIVEKIT_URL } from './config';

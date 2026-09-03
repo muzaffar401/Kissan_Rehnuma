@@ -14,6 +14,7 @@ import ScanHistoryScreen from './src/screens/ScanHistoryScreen';
 import WeatherScreen from './src/screens/WeatherScreen';
 import MarketRatesScreen from './src/screens/MarketRatesScreen';
 import HelplineScreen from './src/screens/HelplineScreen';
+import VoiceCallScreen from './src/screens/VoiceCallScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 
 // Keep native splash visible while app initializes
@@ -21,7 +22,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {
   // On web or if native splash isn't configured, this may fail — safe to ignore
 });
 
-type Screen = 'loading' | 'splash' | 'onboarding' | 'language' | 'login' | 'home' | 'disease' | 'history' | 'weather' | 'market' | 'helpline' | 'settings';
+type Screen = 'loading' | 'splash' | 'onboarding' | 'language' | 'login' | 'home' | 'disease' | 'history' | 'weather' | 'market' | 'helpline' | 'voice-call' | 'settings';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('loading');
@@ -93,6 +94,9 @@ export default function App() {
     }
     if (currentScreen === 'helpline') {
       return <HelplineScreen onNavigate={(s) => setCurrentScreen(s as Screen)} />;
+    }
+    if (currentScreen === 'voice-call') {
+      return <VoiceCallScreen onNavigate={(s) => setCurrentScreen(s as Screen)} />;
     }
     if (currentScreen === 'settings') {
       return <SettingsScreen onNavigate={(s) => setCurrentScreen(s as Screen)} />;

@@ -17,6 +17,7 @@ const KEYS = {
   ACCESS_TOKEN: 'kissan_access_token',
   USER_EMAIL: 'kissan_user_email',
   USER_ID: 'kissan_user_id',
+  USER_NAME: 'kissan_user_name',
   ONBOARDING_COMPLETE: 'kissan_onboarding_complete',
   APP_LANGUAGE: 'kissan_app_language',
 } as const;
@@ -72,11 +73,15 @@ export const tokenStorage = {
   /**
    * Save user info after login.
    */
-  async saveUserInfo(userId: string, email: string): Promise<void> {
-    await Promise.all([
+  async saveUserInfo(userId: string, email: string, name?: string): Promise<void> {
+    const promises: Promise<void>[] = [
       storage.setItem(KEYS.USER_ID, userId),
       storage.setItem(KEYS.USER_EMAIL, email),
-    ]);
+    ];
+    if (name) {
+      promises.push(storage.setItem(KEYS.USER_NAME, name));
+    }
+    await Promise.all(promises);
   },
 
   /**
@@ -91,6 +96,34 @@ export const tokenStorage = {
    */
   async getUserEmail(): Promise<string | null> {
     return storage.getItem(KEYS.USER_EMAIL);
+  },
+
+  /**
+   * Get stored user name.
+   * Falls back to decoding the JWT access token if the cached name is missing
+   * (e.g. the user logged in before the name field was cached).
+   */
+  async getUserName(): Promise<string | null> {
+    const cached = await storage.getItem(KEYS.USER_NAME);
+    if (cached) return cached;
+
+    // Fallback: decode name from JWT payload
+    try {
+      const token = await storage.getItem(KEYS.ACCESS_TOKEN);
+      if (!token) return null;
+      const parts = token.split('.');
+      if (parts.length !== 3) return null;
+      const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const payload = JSON.parse(atob(base64));
+      if (payload.name) {
+        // Cache it for next time
+        await storage.setItem(KEYS.USER_NAME, payload.name);
+        return payload.name;
+      }
+    } catch {
+      // ignore decode errors
+    }
+    return null;
   },
 
   /**
@@ -158,6 +191,7 @@ export const tokenStorage = {
       storage.removeItem(KEYS.ACCESS_TOKEN),
       storage.removeItem(KEYS.USER_ID),
       storage.removeItem(KEYS.USER_EMAIL),
+      storage.removeItem(KEYS.USER_NAME),
     ]);
   },
 
@@ -169,6 +203,7 @@ export const tokenStorage = {
       storage.removeItem(KEYS.ACCESS_TOKEN),
       storage.removeItem(KEYS.USER_ID),
       storage.removeItem(KEYS.USER_EMAIL),
+      storage.removeItem(KEYS.USER_NAME),
       storage.removeItem(KEYS.ONBOARDING_COMPLETE),
       storage.removeItem(KEYS.APP_LANGUAGE),
     ]);

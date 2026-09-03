@@ -229,7 +229,8 @@ def verify_signup_otp(
     # Auto-login: issue JWT so the user can start using the app immediately
     access_token = create_access_token({
         "sub": str(farmer.id),
-        "email": farmer.email
+        "email": farmer.email,
+        "name": farmer.name
     })
 
     return {
@@ -300,7 +301,8 @@ def login(
 
     access_token = create_access_token({
         "sub": str(farmer.id),
-        "email": farmer.email
+        "email": farmer.email,
+        "name": farmer.name
     })
 
     return {

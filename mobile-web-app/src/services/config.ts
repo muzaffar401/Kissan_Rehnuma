@@ -43,6 +43,28 @@ export const API_BASE_URL = `${GATEWAY_URL}${API_PREFIX}`;
 export const GATEWAY_HEALTH = `${GATEWAY_URL}/health`;
 
 /**
+ * Token server URL (voice-agent token_server.py).
+ * Generates LiveKit JWT tokens and dispatches agents to rooms.
+ * Runs on port 8080, same host as the gateway.
+ */
+function getTokenServerUrl(): string {
+  if (!__DEV__) {
+    return 'https://api.kissanrehnuma.com'; // TODO: production token endpoint
+  }
+  if (typeof window !== 'undefined' && window.location) {
+    const hostname = window.location.hostname;
+    return `http://${hostname}:8080`;
+  }
+  return 'http://localhost:8080';
+}
+
+/** LiveKit Cloud WebSocket URL (must match voice-agent-service .env) */
+const LIVEKIT_URL = 'wss://kissan-rehnuma-xa9jeu4t.livekit.cloud';
+
+export const TOKEN_SERVER_URL = getTokenServerUrl();
+export { LIVEKIT_URL };
+
+/**
  * API endpoint paths (relative to API_BASE_URL).
  * Usage: `${API_BASE_URL}${ENDPOINTS.auth.login}`
  */

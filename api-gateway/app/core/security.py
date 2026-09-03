@@ -18,9 +18,13 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=F
 
 
 class TokenPayload(BaseModel):
-    """JWT token payload structure (matches user-auth-service)."""
+    """JWT token payload structure (matches user-auth-service).
+    
+    email is optional because service-to-service JWTs (from voice-agent)
+    only contain 'sub' (farmer_id) without email.
+    """
     sub: str  # farmer ID
-    email: str
+    email: Optional[str] = None
 
 
 async def get_current_user(

@@ -3,6 +3,10 @@ const path = require('path');
 
 const config = getDefaultConfig(__dirname);
 
+// Fix: livekit-client ships .mjs files; Metro needs .mjs in source extensions
+// to resolve ESM-only packages (Expo SDK 57 still missing this by default).
+config.resolver.sourceExts.push('mjs');
+
 // Fix: pdf-lib uses tslib which resolves to CJS build in Metro.
 // Alias tslib to its ES6 build to avoid "__extends" destructuring error.
 const originalResolveRequest = config.resolver.resolveRequest;

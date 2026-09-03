@@ -8,6 +8,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 import json
 import sys
+import threading
 from pathlib import Path
 
 # Add parent directory to path to import app modules
@@ -31,13 +32,27 @@ class TokenHandler(BaseHTTPRequestHandler):
         # Extract identity from query string
         identity = params.get('identity', ['test_farmer'])[0]
         room_name = params.get('room', ['test_room'])[0]
-        
+        farmer_id = params.get('farmer_id', [None])[0]
+        farmer_name = params.get('farmer_name', [''])[0] or 'kissan'
+
+        # Clear log so we can see if the frontend actually sent the name
+        if farmer_name and farmer_name != 'kissan':
+            print(f"[TokenServer] Received farmer_name: {farmer_name}")
+        else:
+            print(f"[TokenServer] farmer_name missing or empty; using default 'kissan'")
+
         # Generate token
         token = self._generate_token(identity, room_name)
-        
-        # Dispatch agent to the room
-        self._dispatch_agent(room_name)
-        
+
+        # Dispatch agent to the room asynchronously so the token response
+        # is not blocked by the LiveKit dispatch API call.
+        threading.Thread(
+            target=self._dispatch_agent,
+            args=(room_name,),
+            kwargs={'farmer_id': farmer_id, 'farmer_name': farmer_name},
+            daemon=True,
+        ).start()
+
         # Send response
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')
@@ -50,8 +65,8 @@ class TokenHandler(BaseHTTPRequestHandler):
             'room': room_name,
         }
         self.wfile.write(json.dumps(response).encode())
-        
-        print(f"✓ Token generated for {identity} in room {room_name}")
+
+        print(f"✓ Token generated for {identity} in room {room_name} (farmer_id={farmer_id}, name={farmer_name!r})")
     
     def _generate_token(self, identity: str, room_name: str) -> str:
         """Generate a LiveKit access token."""
@@ -79,7 +94,7 @@ class TokenHandler(BaseHTTPRequestHandler):
         
         return token.to_jwt()
     
-    def _dispatch_agent(self, room_name: str) -> None:
+    def _dispatch_agent(self, room_name: str, farmer_id: str = None, farmer_name: str = None) -> None:
         """Dispatch an agent to the room using LiveKit API."""
         import os
         import requests
@@ -128,10 +143,18 @@ class TokenHandler(BaseHTTPRequestHandler):
                 "room": room_name,
                 "agentName": "kissan-rehnuma",
             }
-            
+            # Build metadata with farmer info for the agent
+            meta = {}
+            if farmer_id:
+                meta["farmer_id"] = farmer_id
+            if farmer_name:
+                meta["farmer_name"] = farmer_name
+            if meta:
+                data["metadata"] = json.dumps(meta)
+
             response = requests.post(dispatch_url, headers=headers, json=data, timeout=5)
             if response.status_code == 200:
-                print(f"✓ Agent dispatched to room: {room_name}")
+                print(f"✓ Agent dispatched to room: {room_name} (farmer_id={farmer_id}, name={farmer_name})")
             else:
                 print(f"⚠ Agent dispatch failed: {response.status_code} - {response.text}")
         except ImportError:
@@ -147,10 +170,10 @@ class TokenHandler(BaseHTTPRequestHandler):
 def main():
     """Run the token server."""
     port = 8080
-    server = HTTPServer(('localhost', port), TokenHandler)
-    
-    print(f"🔑 Token server running on http://localhost:{port}")
-    print(f"   Get token: http://localhost:{port}/token?identity=farmer_123&room=test_room")
+    server = HTTPServer(('0.0.0.0', port), TokenHandler)
+
+    print(f"🔑 Token server running on http://0.0.0.0:{port}")
+    print(f"   Get token: http://<your-ip>:{port}/token?identity=farmer_123&room=test_room")
     print("   Press Ctrl+C to stop\n")
     
     try:
