@@ -62,6 +62,9 @@ class Settings(BaseSettings):
     min_image_height: int = 224
     allowed_content_types: CommaSeparatedList = ["image/jpeg", "image/png", "image/webp"]
 
+    # ── SSL (set by _production_setup) ─────────────────────────────
+    db_ssl_enabled: bool = False
+
     @property
     def max_image_bytes(self) -> int:
         return self.max_image_size_mb * 1024 * 1024
@@ -87,9 +90,10 @@ class Settings(BaseSettings):
                 self.database_url = self.database_url.replace(
                     "postgresql://", "postgresql+asyncpg://", 1
                 )
-                if "sslmode" not in self.database_url:
-                    sep = "&" if "?" in self.database_url else "?"
-                    self.database_url += f"{sep}sslmode=require"
+            # asyncpg does NOT accept sslmode in the URL — strip it and
+            # enable SSL via connect_args instead.
+            self.database_url = self.database_url.split("?sslmode=")[0]
+            self.db_ssl_enabled = True
         return self
 
 

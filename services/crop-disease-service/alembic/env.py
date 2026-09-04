@@ -1,4 +1,5 @@
 import asyncio
+import ssl
 import sys
 from logging.config import fileConfig
 from pathlib import Path
@@ -44,7 +45,11 @@ def do_run_migrations(connection):
 
 async def run_migrations_online() -> None:
     """Run migrations in 'online' mode — creates an async engine."""
-    connectable = create_async_engine(db_url, poolclass=pool.NullPool)
+    connect_args: dict = {}
+    if settings.db_ssl_enabled:
+        ctx = ssl.create_default_context()
+        connect_args["ssl"] = ctx
+    connectable = create_async_engine(db_url, poolclass=pool.NullPool, connect_args=connect_args)
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
     await connectable.dispose()
