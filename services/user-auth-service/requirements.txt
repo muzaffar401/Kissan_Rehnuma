@@ -8,3 +8,4 @@ python-jose[cryptography]
 pwdlib[argon2]
 aiosmtplib
 pydantic[email]
+httpx
