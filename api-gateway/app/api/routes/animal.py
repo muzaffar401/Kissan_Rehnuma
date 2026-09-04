@@ -126,7 +126,7 @@ async def proxy_detect_disease(
         )
 
         return Response(
-            content=response.content,
+            content=response.text,
             status_code=response.status_code,
             media_type=response.headers.get("content-type", "application/json"),
         )
@@ -211,7 +211,7 @@ async def proxy_scan_history(
         )
 
         return Response(
-            content=response.content,
+            content=response.text,
             status_code=response.status_code,
             media_type=response.headers.get("content-type", "application/json"),
         )
@@ -265,7 +265,7 @@ async def proxy_health_check(request: Request):
         )
 
         return Response(
-            content=response.content,
+            content=response.text,
             status_code=response.status_code,
             media_type=response.headers.get("content-type", "application/json"),
         )

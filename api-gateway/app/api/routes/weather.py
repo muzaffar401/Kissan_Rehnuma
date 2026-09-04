@@ -53,7 +53,7 @@ async def _proxy_request(request: Request, target_url: str, **kwargs) -> Respons
                 **kwargs,
             )
         return Response(
-            content=response.content,
+            content=response.text,
             status_code=response.status_code,
             media_type=response.headers.get("content-type", "application/json"),
         )
@@ -212,7 +212,7 @@ async def proxy_health(request: Request):
     try:
         response = await client.get(f"{settings.weather_alert_service_url}/")
         return Response(
-            content=response.content,
+            content=response.text,
             status_code=response.status_code,
             media_type=response.headers.get("content-type", "application/json"),
         )

@@ -48,11 +48,20 @@ async def _proxy_json(request: Request, target_url: str) -> Response:
                 content=body,
                 headers={**headers, "content-type": "application/json"},
             )
-        return Response(
-            content=response.content,
-            status_code=response.status_code,
-            media_type=response.headers.get("content-type", "application/json"),
-        )
+        # Parse upstream JSON and return via JSONResponse to avoid
+        # raw-bytes encoding issues (uvicorn may compress bytes
+        # without setting Content-Encoding, corrupting the response).
+        try:
+            return JSONResponse(
+                content=response.json(),
+                status_code=response.status_code,
+            )
+        except Exception:
+            return Response(
+                content=response.text,
+                status_code=response.status_code,
+                media_type="application/json",
+            )
     except pybreaker.CircuitBreakerError:
         logger.error("circuit_breaker_open", service=SERVICE_NAME)
         return JSONResponse(
