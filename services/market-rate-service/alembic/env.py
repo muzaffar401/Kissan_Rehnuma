@@ -42,10 +42,17 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
+    # Add SSL for production (Neon requires SSL)
+    import os as _os
+    connect_args = {}
+    if _os.getenv("APP_ENV", "development") == "production":
+        connect_args["sslmode"] = "require"
+
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=connect_args,
     )
     with connectable.connect() as connection:
         context.configure(
