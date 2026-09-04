@@ -13,10 +13,12 @@ from app.api.v1.endpoints.alerts import router as alerts_router
 from app.api.v1.endpoints.devices import router as devices_router
 from app.middleware.auth import AuthMiddleware
 from app.services import scheduler
+from app.core.migrations import run_migrations
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    run_migrations()
     scheduler.start_scheduler()
     yield
     scheduler.stop_scheduler()
