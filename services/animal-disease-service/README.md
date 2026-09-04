@@ -1,248 +1,127 @@
-# Animal Disease Detection Service
+<h1 align="center">Animal Disease Service</h1>
 
-> **Kissan Rehnuma's** second microservice — detects livestock and poultry diseases from images using a comprehensive veterinary differential diagnosis pipeline, identifies symptoms, and recommends treatments with local Pakistani context (medicines, weight-based dosages, PKR costs).
+<p align="center">
+  AI-powered animal disease detection from images with veterinary specialist matching
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.12-blue?logo=python" alt="Python" />
+  <img src="https://img.shields.io/badge/FastAPI-0.115+-green?logo=fastapi" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/LangGraph-Agent-1C3C3C" alt="LangGraph" />
+  <img src="https://img.shields.io/badge/Docker-Multi--stage-2496ED?logo=docker" alt="Docker" />
+</p>
 
 ---
 
-## Tech Stack
+## Overview
 
-| Layer | Technology |
-|-------|-----------|
-| Framework | FastAPI (async) |
-| AI Workflow | LangGraph (stateful agent graph) |
-| Vision LLM | Configurable via OpenRouter (Gemini Flash, GPT-4o, etc.) |
-| API Client | Direct httpx → OpenRouter REST API (no LangChain overhead) |
-| Structured Output | Native `json_schema` response_format + Pydantic v2 validation |
-| Database | PostgreSQL 16 + asyncpg |
-| ORM | SQLAlchemy 2.0 (async) |
-| Migrations | Alembic (auto-run on startup) |
-| Image Storage | Cloudinary |
-| Observability | LangSmith tracing |
-| Container | Docker (multi-stage) |
+The Animal Disease Service detects visible diseases in livestock from images using the same architectural pattern as the Crop Disease Service — Vision LLM analysis, confidence gate, pgvector RAG, and LangGraph orchestration. In addition to disease diagnosis, it matches the farmer with a recommended veterinary specialist based on the identified disease.
+
+Supports Pakistani livestock: cattle, buffalo, goats, sheep, and poultry.
 
 ---
 
 ## Architecture
 
 ```
-Farmer (Mobile App)
-       │
-       │  POST /api/v1/animal/detect
-       ▼
-┌──────────────────────────────────────────────┐
-│            FastAPI Application                │
-│                                              │
-│  validate_image (non-LLM)                    │
-│    → format, size, dimensions                │
-│                                              │
-│  upload_image                                │
-│    → Cloudinary storage                      │
-│                                              │
-│  detect_disease (single LLM call)            │
-│    → base64 encode → direct httpx POST       │
-│    → OpenRouter with native json_schema      │
-│    → veterinary prompt + image               │
-│    → returns VisionDiagnosis                 │
-│                                              │
-│  confidence_gate                             │
-│    → threshold check (default 0.70)          │
-│                                              │
-│  save_to_database                            │
-│    → PostgreSQL animal_disease_logs          │
-└──────────────────────────────────────────────┘
-```
-
-### Single LLM Call Design
-
-The animal/not-animal check is merged INTO the main detection prompt.
-One LLM call handles: animal identification + disease diagnosis + treatment.
-No separate validation round-trip — saves 5-10 seconds per scan.
-
-### Direct API Client
-
-Instead of LangChain's ChatOpenRouter (which adds 15-25% latency overhead),
-this service uses a **direct httpx client** that calls OpenRouter's REST API
-with native `json_schema` response_format.
-
----
-
-## Project Structure
-
-```
-animal-disease-service/
-├── app/
-│   ├── agents/
-│   │   ├── graph.py                  # LangGraph StateGraph + nodes
-│   │   └── prompts/
-│   │       └── veterinary_prompt.py  # 150-line veterinary prompt
-│   ├── api/
-│   │   ├── deps.py                   # DB session dependency
-│   │   ├── router.py                 # Top-level API router
-│   │   └── v1/
-│   │       ├── router.py             # v1 router
-│   │       └── endpoints/
-│   │           └── animal.py         # POST /detect, GET /history
-│   ├── core/
-│   │   ├── config.py                 # pydantic-settings
-│   │   ├── logging.py                # structlog setup
-│   │   └── migrations.py             # auto-migration runner
-│   ├── db/
-│   │   ├── base.py                   # SQLAlchemy Base
-│   │   ├── models.py                 # AnimalDiseaseLog ORM
-│   │   └── session.py                # async engine + session
-│   ├── repositories/
-│   │   └── detection_repo.py         # CRUD for animal_disease_logs
-│   ├── schemas/
-│   │   └── animal.py                 # Pydantic schemas
-│   ├── services/
-│   │   ├── openrouter_client.py      # direct httpx → OpenRouter
-│   │   ├── cloud_storage.py          # Cloudinary uploader
-│   │   └── image_validator.py        # PIL-based pre-flight checks
-│   ├── static/
-│   │   └── test.html                 # Browser test UI
-│   └── main.py                       # FastAPI app factory
-├── alembic/
-│   ├── env.py
-│   ├── script.py.mako
-│   └── versions/
-│       └── a1b2c3d4e5f6_initial_schema.py
-├── alembic.ini
-├── pyproject.toml
-├── Dockerfile
-├── .env
-└── README.md
+Image Upload (animal photo)
+     │
+     ▼
+┌─────────────────┐
+│ Vision LLM       │  ← OpenRouter (Gemini) — disease classification
+└────────┬────────┘
+         ▼
+┌─────────────────┐
+│ Confidence Gate  │  ← ≥ 70% → proceed  |  < 70% → "need more info"
+└────────┬────────┘
+         ▼
+┌─────────────────┐
+│ Symptom Analyzer │  ← LangGraph: combines image + farmer context
+└────────┬────────┘
+         ▼
+┌─────────────────┐
+│ Specialist       │  ← pgvector RAG: match disease → recommended vet
+│ Matcher          │
+└────────┬────────┘
+         ▼
+   Disease + Symptoms + Doctor Recommendation
 ```
 
 ---
 
 ## API Endpoints
 
-### POST /api/v1/animal/detect
-
-Detect disease from an animal/livestock image.
-
-**Form data:**
-- `image` (file, required) — JPEG, PNG, or WebP
-- `user_id` (string, optional) — farmer identifier
-- `language` (string, default: "en") — en, ur, pa, sd
-
-**Response:**
-```json
-{
-  "scan_id": "uuid",
-  "is_animal": true,
-  "animal_type": "Cow",
-  "disease_name": "Foot-and-Mouth Disease",
-  "scientific_name": "Aphthovirus",
-  "confidence": 0.92,
-  "symptoms": ["Vesicles on tongue", "Drooling", "Lameness"],
-  "causes": "Viral infection caused by Aphthovirus...",
-  "treatment_recommendations": "Isolate animal immediately...",
-  "prevention_tips": ["FMD vaccine every 6 months", "..."],
-  "affected_species": "Cattle, buffalo, sheep, goats",
-  "image_url": "https://res.cloudinary.com/...",
-  "language": "en",
-  "message": ""
-}
-```
-
-### GET /api/v1/animal/history
-
-Get past scan results.
-
-**Query params:**
-- `user_id` (optional) — filter by farmer ID
-- `limit` (default: 50, max: 200)
-
-### GET /api/v1/animal/health
-
-Service health check.
-
----
-
-## Database Schema
-
-```sql
-animal_disease_logs
-├── id              UUID (auto-generated)
-├── image_url       TEXT (required)
-├── user_id         VARCHAR(255) (indexed)
-├── language        VARCHAR(5)
-├── is_animal       BOOLEAN
-├── animal_type     VARCHAR(255)
-├── disease_name    VARCHAR(255)
-├── scientific_name VARCHAR(255)
-├── confidence      FLOAT
-├── symptoms        JSONB (array of strings)
-├── causes          TEXT (narrative)
-├── treatment       TEXT (narrative)
-├── prevention_tips JSONB (array of strings)
-├── affected_species TEXT (narrative)
-├── status          ENUM (completed, low_confidence, not_an_animal, failed)
-├── error_message   TEXT
-└── created_at      TIMESTAMPTZ
-```
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/v1/animal/detect` | JWT | Upload image → disease diagnosis + vet recommendation |
+| `GET` | `/api/v1/animal/history` | JWT | Past scan results for current farmer |
+| `GET` | `/api/v1/animal/health` | No | Service health check |
 
 ---
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DATABASE_URL` | `postgresql+asyncpg://...` | PostgreSQL connection |
-| `OPENROUTER_API_KEY` | — | OpenRouter API key |
-| `VISION_MODEL` | `google/gemini-2.5-flash` | Vision LLM model |
-| `VISION_TEMPERATURE` | `0.3` | LLM temperature |
-| `CONFIDENCE_THRESHOLD` | `0.70` | Minimum confidence to pass |
-| `CLOUDINARY_CLOUD_NAME` | — | Cloudinary cloud |
-| `CLOUDINARY_API_KEY` | — | Cloudinary key |
-| `CLOUDINARY_API_SECRET` | — | Cloudinary secret |
-| `CLOUDINARY_FOLDER` | `kissan-rehnuma/animal-scans` | Upload folder |
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `DATABASE_URL` | Yes | — | PostgreSQL connection (`kissan_animal_disease` DB) |
+| `OPENROUTER_API_KEY` | Yes (prod) | — | Vision LLM API key |
+| `VISION_MODEL` | No | `google/gemini-2.5-flash` | Vision model |
+| `VISION_TEMPERATURE` | No | `0.3` | Slightly higher than crop (animal diseases more varied) |
+| `CONFIDENCE_THRESHOLD` | No | `0.70` | Minimum confidence to proceed |
+| `CLOUDINARY_*` | Yes (prod) | — | Image storage (folder: `kissan-rehnuma/animal-scans`) |
+| `LANGSMITH_TRACING` | No | `false` | Enable LangSmith observability |
+| `APP_ENV` | No | `development` | `production` enforces required keys |
 
 ---
 
-## Local Development
+## Quick Start
 
 ```bash
-# Install dependencies
-uv pip install -e .
+cd services/animal-disease-service
 
-# Create PostgreSQL database
-createdb kissan_animal_disease
+# Install dependencies (uv package manager)
+uv sync
 
-# Set environment variables in .env
+# Or with pip
+pip install .
 
-# Run service (port 8002)
-python -m uvicorn app.main:app --reload --port 8002
+# Configure .env
 
-# Open test UI
-# http://localhost:8002/test
+# Start service
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8003
 ```
 
----
+### Docker
 
-## Design Decisions
+```bash
+docker build -t animal-disease-service .
+docker run -p 8003:8003 --env-file .env animal-disease-service
+```
 
-### Why temperature 0.3?
-Veterinary diagnosis demands higher consistency than crop analysis.
-Lower temperature reduces variation in treatment recommendations.
-
-### Why separate database?
-Each microservice owns its data. Animal disease scans have different
-fields (animal_type, affected_species) than crop scans (crop_type,
-affected_crops). Separate DBs prevent schema coupling.
-
-### Why `animal_scan_status` enum?
-Uses a distinct PostgreSQL enum name (`animal_scan_status`) to avoid
-collision with the crop service's `scan_status` enum in shared PG instances.
+Service available at `http://localhost:8003`
 
 ---
 
-## Testing
+## Key Design Decisions
 
-### Browser Test UI
-Visit `http://localhost:8002/test` for an interactive UI:
-- Upload animal/livestock images
-- View diagnosis results with symptoms, treatment, prevention
-- Browse scan history with image thumbnails
-- Auto-refresh after each scan
+| Decision | Rationale |
+|----------|-----------|
+| **Same architecture as crop** | Proven pattern reused; LangGraph graph structure is identical, only prompts differ |
+| **Higher temperature (0.3)** | Animal diseases have more visual variation than crop diseases; slight creativity helps |
+| **Specialist matcher via RAG** | Maps disease → veterinary specialization → recommended doctor from knowledge base |
+| **Separate database** | Animal scan data is domain-specific; no shared tables with other services |
+| **Docker with uv** | Same multi-stage build pattern as crop-disease-service for consistency |
+
+---
+
+## Tech Stack
+
+- **Framework:** FastAPI + Uvicorn (async)
+- **AI Agent:** LangGraph (detect → gate → symptom analysis → specialist matching)
+- **Vision:** OpenRouter Vision API (Gemini)
+- **RAG:** pgvector (PostgreSQL vector similarity search)
+- **Image Storage:** Cloudinary
+- **ORM:** SQLAlchemy 2.0 (async)
+- **Dependencies:** uv + pyproject.toml
+- **Containerization:** Docker (multi-stage build)
+- **Observability:** LangSmith tracing
