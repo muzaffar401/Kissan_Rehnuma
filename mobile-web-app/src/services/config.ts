@@ -17,7 +17,7 @@
  */
 function getGatewayUrl(): string {
   if (!__DEV__) {
-    return 'https://api.kissanrehnuma.com'; // TODO: Update with production URL
+    return 'https://kissan-api-gateway.onrender.com';
   }
 
   // On web, use the same hostname as the frontend (works for mobile browsers)
@@ -49,7 +49,7 @@ export const GATEWAY_HEALTH = `${GATEWAY_URL}/health`;
  */
 function getTokenServerUrl(): string {
   if (!__DEV__) {
-    return 'https://api.kissanrehnuma.com'; // TODO: production token endpoint
+    return 'https://kissan-api-gateway.onrender.com';
   }
   if (typeof window !== 'undefined' && window.location) {
     const hostname = window.location.hostname;
