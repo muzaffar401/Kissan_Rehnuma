@@ -161,7 +161,9 @@ services:
       ADMIN_API_KEY: ${ADMIN_API_KEY:-}
       SCHEDULER_ENABLED: "true"
       SCHEDULER_HOUR: "7"
-      RUN_PIPELINE_ON_STARTUP: "false"
+      # Scrape AMIS/IRFarm once at startup so a fresh database has
+      # rates immediately instead of waiting for the 07:00 cron.
+      RUN_PIPELINE_ON_STARTUP: "true"
     depends_on:
       postgres:
         condition: service_healthy
