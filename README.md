@@ -45,42 +45,53 @@ Built as a **microservices system** with an API Gateway, each feature runs as an
 
 ## Architecture
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                    FARMER  (Mobile / Web Browser)                 │
-│                   React Native (Expo) App                         │
-└─────────────────────────────┬────────────────────────────────────┘
-                              │ HTTPS
-                    Vercel (Frontend) + Cloudflare Tunnel
-                              │
-                              ▼
-┌──────────────────────────────────────────────────────────────────┐
-│              Oracle Cloud ARM VM  (80.225.254.112)               │
-│  ┌────────────────────────────────────────────────────────────┐  │
-│  │  Docker Compose Stack  (10 containers)                     │  │
-│  │  ┌─────────┐                                               │  │
-│  │  │  Nginx   │ ← Port 80 (reverse proxy + SSL via CF)      │  │
-│  │  └────┬─────┘                                               │  │
-│  │       ▼                                                     │  │
-│  │  ┌─────────────────────────────────────────────────────┐   │  │
-│  │  │              API GATEWAY  (port 3000)                │   │  │
-│  │  │  JWT Auth · Rate Limiting · Circuit Breaker · CORS  │   │  │
-│  │  └──┬──────────┬──────────┬──────────┬────────────────┘   │  │
-│  │     │          │          │          │                     │  │
-│  │     ▼          ▼          ▼          ▼                     │  │
-│  │  ┌──────┐ ┌──────┐ ┌────────┐ ┌────────┐ ┌─────────┐    │  │
-│  │  │ Auth │ │ Crop │ │ Animal │ │Weather │ │ Market  │    │  │
-│  │  │ Svc  │ │ Svc  │ │  Svc   │ │  Svc   │ │  Svc    │    │  │
-│  │  └──┬───┘ └──┬───┘ └───┬────┘ └───┬────┘ └───┬─────┘    │  │
-│  │     │        │         │          │           │           │  │
-│  │     └────────┴─────────┴──────────┴───────────┘           │  │
-│  │                    │                                       │  │
-│  │              ┌─────┴──────┐   ┌───────────────┐           │  │
-│  │              │ PostgreSQL │   │  Voice Agent   │           │  │
-│  │              │  16-alpine │   │  (LiveKit Cloud)│          │  │
-│  │              └────────────┘   └───────────────┘           │  │
-│  └────────────────────────────────────────────────────────────┘  │
-└──────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph Farmer["👨‍🌾 Farmer (Mobile / Web Browser)"]
+        App["React Native (Expo) App"]
+    end
+
+    subgraph Vercel["Vercel (Frontend)"]
+        FE["Expo Web Build"]
+    end
+
+    subgraph CF["Cloudflare Tunnel (HTTPS)"]
+        Tunnel["Auto SSL · No cert needed"]
+    end
+
+    subgraph VM["Oracle Cloud ARM VM — Docker Compose (10 containers)"]
+        Nginx["🔀 Nginx<br/>Reverse Proxy :80"]
+        Gateway["🛡️ API Gateway<br/>JWT · Rate Limit · Circuit Breaker"]
+
+        subgraph Services["Microservices"]
+            Auth["🔐 Auth Service<br/>:8002"]
+            Crop["🌿 Crop Disease<br/>:8001"]
+            Animal["🐄 Animal Disease<br/>:8003"]
+            Weather["⛈️ Weather Alert<br/>:8004"]
+            Market["📊 Market Rates<br/>:8005"]
+        end
+
+        subgraph Data["Data & Voice"]
+            PG["🐘 PostgreSQL 16<br/>3 databases"]
+            VA["🎙️ Voice Agent<br/>LiveKit Worker"]
+            VT["🔑 Token Server<br/>:8080"]
+        end
+    end
+
+    subgraph LiveKit["LiveKit Cloud"]
+        LK["WebRTC · STT · TTS"]
+    end
+
+    App -->|HTTPS| FE
+    FE -->|HTTPS| Tunnel
+    Tunnel --> Nginx
+    Nginx --> Gateway
+    Gateway --> Auth & Crop & Animal & Weather & Market
+    Auth & Weather & Market --> PG
+    Crop & Animal --> PG
+    VA <-->|WebSocket| LK
+    VA --> PG
+    VT --> VA
 ```
 
 ### Service Communication
