@@ -15,7 +15,9 @@
   <img src="https://img.shields.io/badge/React_Native-Expo_SDK_57-61dafb?logo=react" alt="React Native" />
   <img src="https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql" alt="PostgreSQL" />
   <img src="https://img.shields.io/badge/LangGraph-Agentic_AI-1C3C3C" alt="LangGraph" />
-  <img src="https://img.shields.io/badge/Deployed_on-Render-46E3B7?logo=render" alt="Render" />
+  <img src="https://img.shields.io/badge/Backend-Oracle_Cloud_VM-FF0000?logo=oracle" alt="Oracle Cloud" />
+  <img src="https://img.shields.io/badge/Frontend-Vercel-000000?logo=vercel" alt="Vercel" />
+  <img src="https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker" alt="Docker Compose" />
 </p>
 
 ---
@@ -49,20 +51,36 @@ Built as a **microservices system** with an API Gateway, each feature runs as an
 │                   React Native (Expo) App                         │
 └─────────────────────────────┬────────────────────────────────────┘
                               │ HTTPS
+                    Vercel (Frontend) + Cloudflare Tunnel
+                              │
                               ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│                         API GATEWAY                                │
-│   JWT Auth  ·  Rate Limiting  ·  Circuit Breaker  ·  CORS        │
-└──┬──────────┬──────────┬──────────┬──────────┬───────────────────┘
-   │          │          │          │          │
-   ▼          ▼          ▼          ▼          ▼
-┌──────┐ ┌──────┐ ┌────────┐ ┌────────┐ ┌─────────┐
-│ Auth │ │ Crop │ │ Animal │ │Weather │ │ Market  │
-│ Svc  │ │ Svc  │ │  Svc   │ │  Svc   │ │  Svc    │
-└──┬───┘ └──┬───┘ └───┬────┘ └───┬────┘ └───┬─────┘
-   │        │         │          │           │
-   └────────┴─────────┴──────────┴───────────┘
-              PostgreSQL (Neon)
+│              Oracle Cloud ARM VM  (80.225.254.112)               │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │  Docker Compose Stack  (10 containers)                     │  │
+│  │  ┌─────────┐                                               │  │
+│  │  │  Nginx   │ ← Port 80 (reverse proxy + SSL via CF)      │  │
+│  │  └────┬─────┘                                               │  │
+│  │       ▼                                                     │  │
+│  │  ┌─────────────────────────────────────────────────────┐   │  │
+│  │  │              API GATEWAY  (port 3000)                │   │  │
+│  │  │  JWT Auth · Rate Limiting · Circuit Breaker · CORS  │   │  │
+│  │  └──┬──────────┬──────────┬──────────┬────────────────┘   │  │
+│  │     │          │          │          │                     │  │
+│  │     ▼          ▼          ▼          ▼                     │  │
+│  │  ┌──────┐ ┌──────┐ ┌────────┐ ┌────────┐ ┌─────────┐    │  │
+│  │  │ Auth │ │ Crop │ │ Animal │ │Weather │ │ Market  │    │  │
+│  │  │ Svc  │ │ Svc  │ │  Svc   │ │  Svc   │ │  Svc    │    │  │
+│  │  └──┬───┘ └──┬───┘ └───┬────┘ └───┬────┘ └───┬─────┘    │  │
+│  │     │        │         │          │           │           │  │
+│  │     └────────┴─────────┴──────────┴───────────┘           │  │
+│  │                    │                                       │  │
+│  │              ┌─────┴──────┐   ┌───────────────┐           │  │
+│  │              │ PostgreSQL │   │  Voice Agent   │           │  │
+│  │              │  16-alpine │   │  (LiveKit Cloud)│          │  │
+│  │              └────────────┘   └───────────────┘           │  │
+│  └────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ### Service Communication
@@ -83,13 +101,13 @@ The API Gateway is the **single entry point** for the frontend. It handles:
 |-------|-----------|
 | **Backend** | Python 3.12 · FastAPI · Uvicorn (async) |
 | **Agentic AI** | LangGraph · LangChain · OpenRouter (Gemini) |
-| **Database** | PostgreSQL 16 (Neon) · SQLAlchemy 2.0 · Alembic |
+| **Database** | PostgreSQL 16 (local container) · SQLAlchemy 2.0 · Alembic |
 | **Vision AI** | Provider pattern (OpenRouter Vision API → swappable) |
 | **Voice** | LiveKit WebRTC · Uplift AI (STT/TTS) |
 | **Weather** | Open-Meteo API (free, no key) · LLM advisory generation |
 | **Market Data** | AMIS Punjab scraper · BeautifulSoup4 · Redis caching |
 | **Frontend** | React Native (Expo SDK 57) · TypeScript · Material Design 3 |
-| **Deployment** | Render.com (backend) · Vercel (frontend) · Neon (database) |
+| **Deployment** | Docker Compose on Oracle Cloud VM · Vercel (frontend) · Cloudflare Tunnel (HTTPS) |
 | **Observability** | LangSmith tracing · structlog |
 
 ---
@@ -108,9 +126,9 @@ Kissan_Rehnuma/
 │   └── voice-agent-service/        # LiveKit → STT → LLM → TTS pipeline
 ├── mobile-web-app/                 # Expo React Native (mobile + web)
 ├── shared/                         # Internal shared Python utilities
-├── infra/                          # Kubernetes manifests, Docker, CI/CD
+├── docker-compose.yml                # Docker Compose (VM deployment)
+├── infra/                            # Nginx config, Docker helpers, CI/CD
 ├── docs/                           # Architecture docs, API specs, ADRs
-├── render.yaml                     # Render Blueprint (IaC deployment)
 └── scripts/                        # Setup, deploy, DB automation
 ```
 
@@ -189,30 +207,45 @@ Each service requires a `.env` file at its root. Key variables:
 
 ## Deployment
 
-Kissan Rehnuma deploys on **100% free tier** infrastructure (no credit card required):
+Kissan Rehnuma runs on a self-hosted Docker Compose stack with a Vercel frontend:
 
 | Component | Platform | Details |
 |-----------|----------|---------|
-| **Backend (6 services)** | [Render.com](https://render.com) | Free tier, 512MB each, auto-scales to zero |
-| **Database** | [Neon](https://neon.tech) | Free Postgres, 0.5GB, never expires |
-| **Frontend** | [Vercel](https://vercel.com) | Hobby plan, Expo static web export |
+| **Backend (10 containers)** | Oracle Cloud Always Free ARM VM | Docker Compose, local Postgres, Nginx reverse proxy |
+| **HTTPS** | Cloudflare Quick Tunnel | Auto HTTPS, no domain cert needed |
+| **Database** | PostgreSQL 16 (container) | 3 databases: kissan_auth, kissan_crop_disease, kissan_animal_disease |
+| **Voice Agent** | LiveKit Cloud + local worker | Agent registered with LiveKit, TTS via Uplift AI |
+| **Frontend** | [Vercel](https://vercel.com) | Expo static web export, auto-deploy on push |
 
-### One-Click Deploy (Render Blueprint)
+### Docker Compose Deployment (VM)
 
-This repository includes a [`render.yaml`](render.yaml) Blueprint file. To deploy:
+```bash
+# 1. Clone the repository
+git clone https://github.com/muzaffar401/Kissan_Rehnuma.git
+cd Kissan_Rehnuma
 
-1. Create 3 databases in [Neon](https://console.neon.tech): `neondb`, `kissan_crop_disease`, `kissan_animal_disease`
-2. Push this repo to GitHub
-3. Go to [Render Dashboard](https://dashboard.render.com) → **New → Blueprint** → connect your repo
-4. Fill in the prompted environment variables (API keys, DB connection strings)
-5. Click **Apply** — all 6 services deploy automatically
+# 2. Set up environment variables
+cp .env.docker.example .env
+# Edit .env with your API keys (Brevo, OpenRouter, LiveKit, Deepgram, Uplift AI, etc.)
+
+# 3. Build and start all 10 containers
+docker compose up -d --build
+
+# 4. Verify
+docker compose ps
+curl http://localhost/health
+```
+
+**Containers:** postgres, user-auth, crop-disease, animal-disease, weather-alert, market-rate, voice-agent, voice-token, api-gateway, nginx
 
 ### Frontend Deployment
+
+Frontend auto-deploys to Vercel on every `git push` to `main`. The `vercel.json` in `mobile-web-app/` configures the Expo web build.
 
 ```bash
 cd mobile-web-app
 npx expo export -p web     # Static export to dist/
-# Deploy dist/ to Vercel
+# Vercel picks up automatically
 ```
 
 ---
@@ -242,7 +275,7 @@ npx expo export -p web     # Static export to dist/
 | Market Rate Service | ✅ Complete — AMIS scraper, 47 commodities, 36 mandis, Redis caching |
 | Voice Agent Service | ✅ Complete — LiveKit WebRTC, STT/TTS pipeline, tool-calling agent |
 | Mobile/Web Frontend | ✅ Complete — 13 screens, dark mode, Material Design 3, bilingual (Urdu/English) |
-| Deployment Config | ✅ Complete — Render Blueprint, Neon Postgres, Vercel frontend |
+| Deployment Config | ✅ Complete — Docker Compose on Oracle Cloud VM, Vercel frontend, Cloudflare HTTPS |
 
 ---
 
