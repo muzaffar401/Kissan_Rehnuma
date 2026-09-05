@@ -17,7 +17,7 @@
  */
 function getGatewayUrl(): string {
   if (!__DEV__) {
-    return 'https://kissan-api-gateway.onrender.com';
+    return 'http://80.225.254.112';
   }
 
   // On web, use the same hostname as the frontend (works for mobile browsers).
@@ -50,7 +50,7 @@ export const GATEWAY_HEALTH = `${GATEWAY_URL}/health`;
  */
 function getTokenServerUrl(): string {
   if (!__DEV__) {
-    return 'https://kissan-api-gateway.onrender.com';
+    return 'http://80.225.254.112:8080';
   }
   if (typeof window !== 'undefined' && window.location) {
     const hostname = window.location.hostname;
