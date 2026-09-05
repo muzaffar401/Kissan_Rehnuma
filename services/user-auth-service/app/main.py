@@ -31,3 +31,10 @@ def root():
     return {
         "message": "User Auth Service is running"
     }
+
+
+@app.get("/health")
+def health():
+    """Liveness probe — reachable only after lifespan migrations succeed,
+    so sibling services (weather-alert) can wait for the shared schema."""
+    return {"status": "ok"}

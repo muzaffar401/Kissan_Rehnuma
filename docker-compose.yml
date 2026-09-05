@@ -56,6 +56,14 @@ services:
       BREVO_API_KEY: ${BREVO_API_KEY:-}
       BREVO_SENDER_EMAIL: ${BREVO_SENDER_EMAIL:-noreply@kissanrehnuma.com}
       BREVO_SENDER_NAME: ${BREVO_SENDER_NAME:-Kissan Rehnuma}
+    # /health only answers after lifespan migrations succeed, so a
+    # healthy status guarantees the shared `farmers` table exists.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     depends_on:
       postgres:
         condition: service_healthy
@@ -131,8 +139,12 @@ services:
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?Set OPENROUTER_API_KEY in .env}
       LLM_MODEL: ${LLM_MODEL:-google/gemini-2.5-flash}
       LLM_MAX_TOKENS: "200"
+    # Its first migration FKs to `farmers`, which user-auth creates —
+    # wait for user-auth to be fully up (migrations done) before starting.
     depends_on:
       postgres:
+        condition: service_healthy
+      user-auth:
         condition: service_healthy
     networks: [kissan]
 
