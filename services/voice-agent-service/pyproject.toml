@@ -31,6 +31,10 @@ dependencies = [
     "httpx>=0.26.0",
     "aiohttp>=3.9.0",
     "python-socketio>=5.11.0",
+
+    # Token server (token_server.py)
+    "requests>=2.31.0",
+    "PyJWT>=2.8.0",
     
     # Utilities
     "python-json-logger>=2.0.0",

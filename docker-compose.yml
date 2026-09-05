@@ -170,6 +170,53 @@ services:
     networks: [kissan]
 
   # ──────────────────────────────────────────────────────────
+  # Voice Agent Worker (LiveKit) — connects OUT to LiveKit Cloud,
+  # receives dispatched room jobs. No inbound port needed.
+  # ──────────────────────────────────────────────────────────
+  voice-agent:
+    build: ./services/voice-agent-service
+    restart: unless-stopped
+    command: ["agent"]
+    environment:
+      APP_ENV: production
+      LOG_LEVEL: INFO
+      DATABASE_URL: postgresql+asyncpg://kissan:${POSTGRES_PASSWORD}@postgres:5432/voice_agent
+      LIVEKIT_URL: ${LIVEKIT_URL:?Set LIVEKIT_URL in .env}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?Set LIVEKIT_API_KEY in .env}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?Set LIVEKIT_API_SECRET in .env}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?Set OPENROUTER_API_KEY in .env}
+      OPENROUTER_MODEL: ${LLM_MODEL:-google/gemini-2.5-flash}
+      DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY:?Set DEEPGRAM_API_KEY in .env}
+      UPLIFT_API_KEY: ${UPLIFT_API_KEY:?Set UPLIFT_API_KEY in .env}
+      UPLIFT_VOICE_ID: v_8eelc901
+      UPLIFT_OUTPUT_FORMAT: MP3_22050_32
+      # Internal docker-network service URLs (agent tools call these)
+      WEATHER_SERVICE_URL: http://weather-alert:8004
+      MARKET_RATE_SERVICE_URL: http://market-rate:8005
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}
+      AGENT_LANGUAGE: "ur"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [kissan]
+
+  # ──────────────────────────────────────────────────────────
+  # Voice Token Server — issues LiveKit room tokens to the
+  # frontend (frontend calls http://<host>:8080/?identity=...).
+  # ──────────────────────────────────────────────────────────
+  voice-token:
+    build: ./services/voice-agent-service
+    restart: unless-stopped
+    command: ["token-server"]
+    environment:
+      LIVEKIT_URL: ${LIVEKIT_URL:?Set LIVEKIT_URL in .env}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?Set LIVEKIT_API_KEY in .env}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?Set LIVEKIT_API_SECRET in .env}
+    ports:
+      - "8080:8080"
+    networks: [kissan]
+
+  # ──────────────────────────────────────────────────────────
   # API Gateway (port 3000) — single public entry point
   # ──────────────────────────────────────────────────────────
   api-gateway:

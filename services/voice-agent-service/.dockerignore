@@ -1,0 +1,14 @@
+.env
+.venv
+venv
+__pycache__
+*.pyc
+.pytest_cache
+*.egg-info
+.git
+tests
+chat_test.py
+check_complaints.py
+migrate_complaints.py
+test_agent.py
+token_server.py.log
