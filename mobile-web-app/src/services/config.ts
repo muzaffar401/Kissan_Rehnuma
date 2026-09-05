@@ -8,8 +8,8 @@
 
 /**
  * Gateway base URL.
- * - Web development: http://localhost:3000
- * - Android emulator: http://10.0.2.2:3000 (localhost from emulator)
+ * - Local development: http://localhost (docker compose nginx on port 80)
+ * - Android emulator: http://10.0.2.2 (localhost from emulator)
  * - Physical device/mobile browser: use same hostname as frontend
  *
  * Dynamic detection: Uses window.location.hostname on web so mobile browsers
@@ -20,15 +20,16 @@ function getGatewayUrl(): string {
     return 'https://kissan-api-gateway.onrender.com';
   }
 
-  // On web, use the same hostname as the frontend (works for mobile browsers)
+  // On web, use the same hostname as the frontend (works for mobile browsers).
+  // Local Docker stack exposes the gateway through nginx on port 80.
   if (typeof window !== 'undefined' && window.location) {
     const hostname = window.location.hostname;
     // If accessed via IP (mobile) or localhost (computer), use same host
-    return `http://${hostname}:3000`;
+    return `http://${hostname}`;
   }
 
   // Fallback for native (React Native)
-  return 'http://localhost:3000';
+  return 'http://localhost';
 }
 
 const GATEWAY_URL = getGatewayUrl();
