@@ -1,0 +1,17 @@
+# Never bake secrets or local artifacts into the image
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+tests/
+*.egg-info/
+.git/
+.gitignore
+Dockerfile
+.dockerignore
+README.md
+uv.lock

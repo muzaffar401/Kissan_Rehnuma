@@ -5,9 +5,11 @@ from sqlalchemy.orm import sessionmaker
 
 from app.core.config import DATABASE_URL
 
-# In production (Neon / Render), SSL is required.
+# Neon (and most managed Postgres) requires SSL; a self-hosted Postgres
+# container (VPS/docker-compose) runs without SSL. Gate on the DB host so
+# the same image works in both environments.
 connect_args = {}
-if os.getenv("APP_ENV", "development") == "production":
+if "neon.tech" in DATABASE_URL:
     connect_args["sslmode"] = "require"
 
 engine = create_engine(DATABASE_URL, connect_args=connect_args)

@@ -11,11 +11,11 @@ DATABASE_URL = os.getenv(
     "postgresql://postgres:postgres@localhost:5432/Farmers",
 )
 
-# In production (Neon / Render), SSL is required.
-# psycopg2 supports sslmode via connect_args.
-APP_ENV = os.getenv("APP_ENV", "development")
+# Neon (and most managed Postgres) requires SSL; a self-hosted Postgres
+# container (VPS/docker-compose) runs without SSL. Gate on the DB host so
+# the same image works in both environments.
 connect_args = {}
-if APP_ENV == "production":
+if "neon.tech" in DATABASE_URL:
     connect_args["sslmode"] = "require"
 
 engine = create_engine(DATABASE_URL, connect_args=connect_args)

@@ -44,10 +44,11 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    # Add SSL for production (Neon requires SSL)
-    import os as _os
+    # SSL only for managed hosts like Neon; a self-hosted Postgres
+    # container (VPS/docker-compose) runs without SSL.
     connect_args = {}
-    if _os.getenv("APP_ENV", "development") == "production":
+    _url = os.getenv("DATABASE_URL") or config.get_main_option("sqlalchemy.url") or ""
+    if "neon.tech" in _url:
         connect_args["sslmode"] = "require"
 
     connectable = engine_from_config(

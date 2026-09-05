@@ -93,7 +93,9 @@ class Settings(BaseSettings):
             # asyncpg does NOT accept sslmode in the URL — strip it and
             # enable SSL via connect_args instead.
             self.database_url = self.database_url.split("?sslmode=")[0]
-            self.db_ssl_enabled = True
+            # SSL only for managed hosts like Neon; a self-hosted Postgres
+            # container (VPS/docker-compose) runs without SSL.
+            self.db_ssl_enabled = "neon.tech" in self.database_url
         return self
 
 

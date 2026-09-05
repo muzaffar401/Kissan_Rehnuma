@@ -1,0 +1,209 @@
+# ============================================================
+# Kissan Rehnuma — Full backend stack (single VPS deployment)
+# ============================================================
+# Usage:
+#   cp .env.docker.example .env    # then fill in real secrets
+#   docker compose up -d --build
+#
+# Stack: postgres + 6 FastAPI services + nginx reverse proxy
+# (voice-agent-service needs LiveKit infra — deploy separately)
+#
+# Ports are NOT published for internal services; only nginx (80)
+# is exposed. Inter-service traffic stays on the docker network.
+# ============================================================
+
+name: kissan-rehnuma
+
+services:
+
+  # ──────────────────────────────────────────────────────────
+  # PostgreSQL — 3 databases:
+  #   kissan_auth          (user-auth + weather-alert + market-rate)
+  #   kissan_crop_disease  (crop-disease-service)
+  #   kissan_animal_disease(animal-disease-service)
+  # ──────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kissan
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: kissan_auth
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/docker/postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kissan -d kissan_auth"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [kissan]
+
+  # ──────────────────────────────────────────────────────────
+  # User Auth Service (port 8002) — farmers, OTP, JWT
+  # ──────────────────────────────────────────────────────────
+  user-auth:
+    build: ./services/user-auth-service
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      DEBUG: "false"
+      PORT: 8002
+      DATABASE_URL: postgresql://kissan:${POSTGRES_PASSWORD}@postgres:5432/kissan_auth
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}
+      JWT_EXPIRY_MINUTES: "1440"
+      # Brevo transactional email (HTTP API — works everywhere)
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
+      BREVO_SENDER_EMAIL: ${BREVO_SENDER_EMAIL:-noreply@kissanrehnuma.com}
+      BREVO_SENDER_NAME: ${BREVO_SENDER_NAME:-Kissan Rehnuma}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [kissan]
+
+  # ──────────────────────────────────────────────────────────
+  # Crop Disease Service (port 8001) — vision LLM detection
+  # ──────────────────────────────────────────────────────────
+  crop-disease:
+    build: ./services/crop-disease-service
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      DEBUG: "false"
+      PORT: 8001
+      DATABASE_URL: postgresql://kissan:${POSTGRES_PASSWORD}@postgres:5432/kissan_crop_disease
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?Set OPENROUTER_API_KEY in .env}
+      VISION_MODEL: ${VISION_MODEL:-google/gemini-2.5-flash}
+      VISION_TEMPERATURE: "0.1"
+      VISION_MAX_TOKENS: "2048"
+      CONFIDENCE_THRESHOLD: "0.70"
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:?Set CLOUDINARY_CLOUD_NAME in .env}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:?Set CLOUDINARY_API_KEY in .env}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:?Set CLOUDINARY_API_SECRET in .env}
+      CLOUDINARY_FOLDER: kissan-rehnuma/crop-scans
+      LANGSMITH_TRACING: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [kissan]
+
+  # ──────────────────────────────────────────────────────────
+  # Animal Disease Service (port 8003) — vision LLM detection
+  # ──────────────────────────────────────────────────────────
+  animal-disease:
+    build: ./services/animal-disease-service
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      DEBUG: "false"
+      PORT: 8003
+      DATABASE_URL: postgresql://kissan:${POSTGRES_PASSWORD}@postgres:5432/kissan_animal_disease
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?Set OPENROUTER_API_KEY in .env}
+      VISION_MODEL: ${VISION_MODEL:-google/gemini-2.5-flash}
+      VISION_TEMPERATURE: "0.3"
+      VISION_MAX_TOKENS: "2048"
+      CONFIDENCE_THRESHOLD: "0.70"
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:?Set CLOUDINARY_CLOUD_NAME in .env}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:?Set CLOUDINARY_API_KEY in .env}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:?Set CLOUDINARY_API_SECRET in .env}
+      CLOUDINARY_FOLDER: kissan-rehnuma/animal-scans
+      LANGSMITH_TRACING: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [kissan]
+
+  # ──────────────────────────────────────────────────────────
+  # Weather Alert Service (port 8004) — alerts + LLM advisories
+  # Shares kissan_auth DB with user-auth (farmers table)
+  # ──────────────────────────────────────────────────────────
+  weather-alert:
+    build: ./services/weather-alert-service
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      DEBUG: "false"
+      PORT: 8004
+      DATABASE_URL: postgresql://kissan:${POSTGRES_PASSWORD}@postgres:5432/kissan_auth
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}
+      SCHEDULER_ENABLED: ${SCHEDULER_ENABLED:-true}
+      SCHEDULER_INTERVAL_MINUTES: "30"
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?Set OPENROUTER_API_KEY in .env}
+      LLM_MODEL: ${LLM_MODEL:-google/gemini-2.5-flash}
+      LLM_MAX_TOKENS: "200"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [kissan]
+
+  # ──────────────────────────────────────────────────────────
+  # Market Rate Service (port 8005) — AMIS scraping + prices
+  # Shares kissan_auth DB with user-auth (farmers table)
+  # ──────────────────────────────────────────────────────────
+  market-rate:
+    build: ./services/market-rate-service
+    restart: unless-stopped
+    environment:
+      PORT: 8005
+      DATABASE_URL: postgresql://kissan:${POSTGRES_PASSWORD}@postgres:5432/kissan_auth
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-}
+      SCHEDULER_ENABLED: "true"
+      SCHEDULER_HOUR: "7"
+      RUN_PIPELINE_ON_STARTUP: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [kissan]
+
+  # ──────────────────────────────────────────────────────────
+  # API Gateway (port 3000) — single public entry point
+  # ──────────────────────────────────────────────────────────
+  api-gateway:
+    build: ./api-gateway
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      DEBUG: "false"
+      PORT: 3000
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}
+      RATE_LIMIT_PER_MINUTE: "60"
+      # Comma-separated list — include your Vercel frontend URL
+      CORS_ORIGINS: ${CORS_ORIGINS:?Set CORS_ORIGINS in .env}
+      # Internal docker-network service URLs
+      CROP_DISEASE_SERVICE_URL: http://crop-disease:8001
+      USER_AUTH_SERVICE_URL: http://user-auth:8002
+      ANIMAL_DISEASE_SERVICE_URL: http://animal-disease:8003
+      WEATHER_ALERT_SERVICE_URL: http://weather-alert:8004
+      MARKET_RATE_SERVICE_URL: http://market-rate:8005
+    depends_on:
+      - user-auth
+      - crop-disease
+      - animal-disease
+      - weather-alert
+      - market-rate
+    networks: [kissan]
+
+  # ──────────────────────────────────────────────────────────
+  # Nginx — reverse proxy (the only exposed port)
+  # ──────────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      # Uncomment after running certbot (HTTPS section in nginx.conf):
+      # - "443:443"
+    volumes:
+      - ./infra/docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # Uncomment for HTTPS (certbot writes here):
+      # - ./infra/docker/nginx/certbot:/etc/letsencrypt:ro
+    depends_on:
+      - api-gateway
+    networks: [kissan]
+
+volumes:
+  pgdata:
+
+networks:
+  kissan:
+    driver: bridge
