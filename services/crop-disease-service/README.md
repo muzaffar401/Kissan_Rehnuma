@@ -23,33 +23,15 @@ The LLM **never diagnoses** — it only explains verified diagnoses in farmer-fr
 
 ## Architecture
 
-```
-Image Upload
-     │
-     ▼
-┌─────────────────┐
-│ Image Validation │  ← Size, format, quality checks
-└────────┬────────┘
-         ▼
-┌─────────────────┐
-│ Vision LLM       │  ← OpenRouter (Gemini) — disease classification
-│ (CV Detector)    │
-└────────┬────────┘
-         ▼
-┌─────────────────┐
-│ Confidence Gate  │  ← ≥ 70% → proceed  |  < 70% → "cannot diagnose"
-└────────┬────────┘
-         ▼
-┌─────────────────┐
-│ pgvector RAG     │  ← Retrieve verified symptoms, treatment, prevention
-└────────┬────────┘
-         ▼
-┌─────────────────┐
-│ LangGraph Agent  │  ← Orchestrate: retrieve → format → generate
-└────────┬────────┘
-         ▼
-   Diagnosis + Advisory
-   (Urdu / Roman Urdu)
+```mermaid
+graph TD
+    A["📷 Image Upload"] --> B["🔍 Image Validation<br/><i>Size, format, quality</i>"]
+    B --> C["👁️ Vision LLM<br/><i>OpenRouter Gemini</i>"]
+    C --> D{"✅ Confidence Gate<br/>≥ 70%?"}
+    D -->|Yes| E["📚 pgvector RAG<br/><i>Verified symptoms & treatment</i>"]
+    D -->|No| F["❌ Cannot diagnose"]
+    E --> G["🤖 LangGraph Agent<br/><i>Retrieve → Format → Generate</i>"]
+    G --> H["📋 Diagnosis + Advisory<br/><i>Urdu / Roman Urdu</i>"]
 ```
 
 ---

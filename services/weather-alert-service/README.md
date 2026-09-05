@@ -36,25 +36,12 @@ Shares the `farmers` table with user-auth-service (reads farmer locations) and o
 
 ## Architecture
 
-```
-┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
-│  Open-Meteo API  │────►│  Weather Cache   │────►│  Risk Analyzer   │
-│  (free, no key)  │     │  (DB + TTL)      │     │  (thresholds)    │
-└──────────────────┘     └──────────────────┘     └────────┬─────────┘
-                                                            │
-                                                            ▼
-                                                   ┌──────────────────┐
-                                                   │  LLM Advisory    │
-                                                   │  (Gemini →       │
-                                                   │   Roman Urdu)    │
-                                                   └────────┬─────────┘
-                                                            │
-                                                            ▼
-                                                   ┌──────────────────┐
-                                                   │  Alert Dispatch  │
-                                                   │  (Log / SMS /    │
-                                                   │   Push Notif)    │
-                                                   └──────────────────┘
+```mermaid
+graph LR
+    OM["☁️ Open-Meteo API<br/>(free, no key)"] --> WC["🗄️ Weather Cache<br/>(DB + TTL)"]
+    WC --> RA["⚠️ Risk Analyzer<br/>(thresholds)"]
+    RA --> LA["🤖 LLM Advisory<br/>(Gemini → Roman Urdu)"]
+    LA --> AD["📬 Alert Dispatch<br/>(Log / SMS / Push)"]
 ```
 
 ### Multi-Layer Caching

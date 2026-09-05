@@ -22,34 +22,24 @@ The agent uses **Urdu script output** for TTS (smoother voice quality) and **aud
 
 ## Architecture
 
-```
-Farmer (Web Browser)
-     │
-     │ WebRTC (LiveKit)
-     ▼
-┌──────────────────────────────────────────────────┐
-│              VOICE AGENT SERVICE                   │
-│                                                    │
-│  ┌──────────┐  ┌──────────┐  ┌───────────────┐   │
-│  │   VAD    │→ │   STT    │→ │  Turn Detect  │   │
-│  │ (Silero) │  │(Deepgram)│  │  (audio-based) │   │
-│  └──────────┘  └──────────┘  └───────┬───────┘   │
-│                                      │            │
-│                                      ▼            │
-│  ┌──────────────────────────────────────────┐     │
-│  │         LangGraph Agent (LLM)             │     │
-│  │  ┌────────┐ ┌────────┐ ┌────────────┐    │     │
-│  │  │Weather │ │ Market │ │Crop Disease│    │     │
-│  │  │  Tool  │ │  Tool  │ │   Tool     │    │     │
-│  │  └────────┘ └────────┘ └────────────┘    │     │
-│  └──────────────────┬───────────────────────┘     │
-│                     │                              │
-│                     ▼                              │
-│  ┌──────────────────────────────────────────┐     │
-│  │              TTS (ElevenLabs)              │     │
-│  │         Preemptive generation               │     │
-│  └──────────────────────────────────────────┘     │
-└──────────────────────────────────────────────────┘
+```mermaid
+graph LR
+    Farmer["👨‍🌾 Farmer<br/>(Web Browser)"] -->|WebRTC| LK["LiveKit Cloud"]
+    LK --> VA["Voice Agent Service"]
+
+    subgraph VA
+        VAD["🎤 VAD<br/>(Silero)"] --> STT["🗣️ STT<br/>(Deepgram)"]
+        STT --> TD["🔊 Turn Detection<br/>(audio-based)"]
+        TD --> Agent["🧠 LangGraph Agent<br/>(OpenRouter Gemini)"]
+        Agent --> Tools["🔧 Tools"]
+        Tools --> TW["Weather"]
+        Tools --> TM["Market"]
+        Tools --> TC["Crop Disease"]
+        Agent --> TTS["🔈 TTS<br/>(Uplift AI - Urdu)"]
+    end
+
+    VA --> LK
+    LK --> Farmer
 ```
 
 ### Pipeline Components
@@ -60,7 +50,7 @@ Farmer (Web Browser)
 | **STT** | Deepgram | Speech-to-Text (Urdu) |
 | **Turn Detection** | Audio-based | Detect when farmer stops speaking |
 | **LLM** | OpenRouter (Gemini) | Understands problem, calls tools, generates response |
-| **TTS** | ElevenLabs | Text-to-Speech (Urdu voice) |
+| **TTS** | Uplift AI | Text-to-Speech (Urdu voice) |
 
 ---
 
@@ -84,7 +74,7 @@ Farmer (Web Browser)
 | `LIVEKIT_API_SECRET` | Yes | LiveKit API secret |
 | `DEEPGRAM_API_KEY` | Yes | Speech-to-Text API key |
 | `OPENROUTER_API_KEY` | Yes | LLM provider API key |
-| `ELEVENLABS_API_KEY` | Yes | Text-to-Speech API key |
+| `UPLIFT_API_KEY` | Yes | Uplift AI TTS API key (Urdu text-to-speech) |
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
 
 ---
@@ -99,7 +89,7 @@ pip install -e .
 # Configure .env with all API keys
 
 # Run the agent worker
-python -m app.main
+python -m app.main start
 
 # Run the token server (for LiveKit JWT generation)
 python token_server.py
@@ -138,6 +128,6 @@ Token server available at `http://localhost:8080`
 - **WebRTC:** LiveKit (cloud-hosted, room-based)
 - **STT:** Deepgram (Urdu language support)
 - **LLM:** OpenRouter (Gemini) with LangGraph tool-calling agent
-- **TTS:** ElevenLabs (multilingual voices)
+- **TTS:** Uplift AI (Urdu text-to-speech)
 - **VAD:** Silero (PyTorch, local inference)
 - **Framework:** LiveKit Agents SDK (Python)

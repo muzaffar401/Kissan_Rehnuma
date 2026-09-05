@@ -34,24 +34,12 @@ When Redis is available, prices are cached for fast reads. Without Redis, the se
 
 ## Architecture
 
-```
-┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
-│  AMIS Punjab     │────►│  Price Scraper   │────►│  Normalizer      │
-│  (amis.pk)       │     │  (BeautifulSoup) │     │  (150+ mappings) │
-└──────────────────┘     └──────────────────┘     └────────┬─────────┘
-                                                            │
-                                                            ▼
-                                                   ┌──────────────────┐
-                                                   │  Unit Converter   │
-                                                   │  (quintal → kg)  │
-                                                   └────────┬─────────┘
-                                                            │
-                                                            ▼
-                                                   ┌──────────────────┐
-                                                   │  Price Store     │
-                                                   │  (PostgreSQL +   │
-                                                   │   Redis cache)   │
-                                                   └──────────────────┘
+```mermaid
+graph LR
+    AMIS["🏛️ AMIS Punjab<br/>(amis.pk)"] --> PS["🕷️ Price Scraper<br/>(BeautifulSoup)"]
+    PS --> N["🔄 Normalizer<br/>(150+ mappings)"]
+    N --> UC["📐 Unit Converter<br/>(quintal → kg)"]
+    UC --> Store["💰 Price Store<br/>(PostgreSQL + Redis)"]
 ```
 
 ### Daily Pipeline

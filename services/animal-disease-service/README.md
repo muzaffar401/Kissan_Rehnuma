@@ -23,28 +23,14 @@ Supports Pakistani livestock: cattle, buffalo, goats, sheep, and poultry.
 
 ## Architecture
 
-```
-Image Upload (animal photo)
-     │
-     ▼
-┌─────────────────┐
-│ Vision LLM       │  ← OpenRouter (Gemini) — disease classification
-└────────┬────────┘
-         ▼
-┌─────────────────┐
-│ Confidence Gate  │  ← ≥ 70% → proceed  |  < 70% → "need more info"
-└────────┬────────┘
-         ▼
-┌─────────────────┐
-│ Symptom Analyzer │  ← LangGraph: combines image + farmer context
-└────────┬────────┘
-         ▼
-┌─────────────────┐
-│ Specialist       │  ← pgvector RAG: match disease → recommended vet
-│ Matcher          │
-└────────┬────────┘
-         ▼
-   Disease + Symptoms + Doctor Recommendation
+```mermaid
+graph TD
+    A["📷 Image Upload<br/>(animal photo)"] --> B["👁️ Vision LLM<br/><i>OpenRouter Gemini</i>"]
+    B --> C{"✅ Confidence Gate<br/>≥ 70%?"}
+    C -->|Yes| D["🔬 Symptom Analyzer<br/><i>LangGraph: image + context</i>"]
+    C -->|No| E["❌ Need more info"]
+    D --> F["🩺 Specialist Matcher<br/><i>pgvector RAG: disease → vet</i>"]
+    F --> G["📋 Disease + Symptoms<br/>+ Doctor Recommendation"]
 ```
 
 ---

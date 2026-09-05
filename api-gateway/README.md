@@ -20,35 +20,23 @@ The API Gateway is the **single entry point** for the Kissan Rehnuma frontend. I
 
 ## Architecture
 
-```
-Frontend (Expo App)
-       │
-       │  HTTPS
-       ▼
-┌──────────────────────────────────────────────┐
-│                API GATEWAY                      │
-│                                                  │
-│  ┌────────┐  ┌──────────┐  ┌───────────────┐   │
-│  │  JWT   │  │   Rate   │  │   Circuit     │   │
-│  │  Auth  │  │  Limiter │  │   Breaker     │   │
-│  └────┬───┘  └────┬─────┘  └───────┬───────┘   │
-│       │           │                │            │
-│       └───────────┼────────────────┘            │
-│                   ▼                              │
-│           ┌──────────────┐                      │
-│           │   Router     │                      │
-│           │  /auth/*  → user-auth-service       │
-│           │  /crop/*  → crop-disease-service    │
-│           │  /animal/*→ animal-disease-service   │
-│           │  /weather/*→ weather-alert-service   │
-│           │  /market/*→ market-rate-service      │
-│           └──────┬───────┘                      │
-└──────────────────┼──────────────────────────────┘
-                   │
-          ┌────────┼────────┬──────────┬─────────┐
-          ▼        ▼        ▼          ▼         ▼
-       Auth     Crop    Animal    Weather    Market
-       Svc      Svc     Svc       Svc        Svc
+```mermaid
+graph TD
+    FE["📱 Frontend (Expo App)"] -->|HTTPS| GW["API Gateway"]
+
+    subgraph GW["🛡️ API Gateway"]
+        JWT["🔐 JWT Auth"]
+        RL["⏱️ Rate Limiter"]
+        CB["🔌 Circuit Breaker"]
+        Router["🔀 Router"]
+        JWT --> RL --> CB --> Router
+    end
+
+    Router -->|"/auth/*"| Auth["🔑 Auth Svc"]
+    Router -->|"/crop/*"| Crop["🌿 Crop Svc"]
+    Router -->|"/animal/*"| Animal["🐄 Animal Svc"]
+    Router -->|"/weather/*"| Weather["⛈️ Weather Svc"]
+    Router -->|"/market/*"| Market["📊 Market Svc"]
 ```
 
 ---
