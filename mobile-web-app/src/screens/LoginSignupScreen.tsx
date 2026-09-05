@@ -552,7 +552,7 @@ const createInputStyles = (colors: ColorPalette) => StyleSheet.create({
 });
 
 const createStyles = (colors: ColorPalette) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: colors.background, overflow: 'hidden' },
   bgBlobTopLeft: {
     position: 'absolute', top: -80, left: -80, width: 300, height: 300,
     borderRadius: 150, backgroundColor: colors.onPrimaryContainer, opacity: 0.3,
