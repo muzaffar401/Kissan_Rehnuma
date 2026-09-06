@@ -127,7 +127,7 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
       >
         {/* Logo */}
         <View style={styles.logoContainer}>
-          <Image source={require('../../assets/logo.jpg')} style={styles.logo as ImageStyle} />
+          <Image source={require('../../assets/logo.png')} style={styles.logo as ImageStyle} />
         </View>
 
         {/* App Name */}

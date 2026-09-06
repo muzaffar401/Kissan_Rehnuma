@@ -20,7 +20,7 @@
       "package": "com.muzaffar401.kissanrehnuma"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "../../assets/logo.png"
     },
     "plugins": [
       "expo-font",

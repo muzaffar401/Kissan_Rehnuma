@@ -10,6 +10,7 @@
     "@pdf-lib/fontkit": "^1.1.1",
     "arabic-reshaper": "^1.1.0",
     "expo": "~57.0.18",
+    "expo-blur": "~57.0.2",
     "expo-font": "~57.0.2",
     "expo-image-picker": "~57.0.14",
     "expo-linear-gradient": "~57.0.1",

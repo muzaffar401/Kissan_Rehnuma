@@ -66,7 +66,7 @@ export default function AdminLoginScreen({ onLogin, onBack }: Props) {
         {/* Header */}
         <View style={styles_.header}>
           <View style={styles_.logoWrap}>
-            <Image source={require('../../../assets/logo.jpg')} style={styles_.logo} />
+            <Image source={require('../../../assets/logo.png')} style={styles_.logo} />
           </View>
           <Text style={styles_.title}>Admin Panel</Text>
           <Text style={styles_.subtitle}>Kissan Rehnuma Management</Text>

@@ -397,7 +397,7 @@ export default function LoginSignupScreen({ onComplete }: LoginSignupScreenProps
       <View style={styles.bgBlobBottomRight} />
 
       <View style={styles.appBar}>
-        <Image source={require('../../assets/logo.jpg')} style={styles.appBarLogo} />
+        <Image source={require('../../assets/logo.png')} style={styles.appBarLogo} />
         <Text style={styles.appBarTitle}>{t('common.appName')}</Text>
         <View style={{ width: 32 }} />
       </View>
