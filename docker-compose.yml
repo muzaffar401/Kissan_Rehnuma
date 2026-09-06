@@ -245,6 +245,28 @@ services:
     networks: [kissan]
 
   # ──────────────────────────────────────────────────────────
+  # Admin Service (port 8006) — read-only dashboard API
+  # Connects to all 4 databases for aggregate stats
+  # ──────────────────────────────────────────────────────────
+  admin-service:
+    build: ./services/admin-service
+    restart: unless-stopped
+    environment:
+      PORT: 8006
+      AUTH_DB_URL: postgresql+asyncpg://kissan:${POSTGRES_PASSWORD}@postgres:5432/kissan_auth
+      CROP_DB_URL: postgresql+asyncpg://kissan:${POSTGRES_PASSWORD}@postgres:5432/kissan_crop_disease
+      ANIMAL_DB_URL: postgresql+asyncpg://kissan:${POSTGRES_PASSWORD}@postgres:5432/kissan_animal_disease
+      VOICE_DB_URL: postgresql+asyncpg://kissan:${POSTGRES_PASSWORD}@postgres:5432/voice_agent
+      ADMIN_SECRET_KEY: ${ADMIN_SECRET_KEY:-admin-secret-change-me}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin@kissanrehnuma.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin1234}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000,http://localhost:8081,http://localhost:8082}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [kissan]
+
+  # ──────────────────────────────────────────────────────────
   # Nginx — reverse proxy (the only exposed port)
   # ──────────────────────────────────────────────────────────
   nginx:
@@ -260,6 +282,7 @@ services:
       # - ./infra/docker/nginx/certbot:/etc/letsencrypt:ro
     depends_on:
       - api-gateway
+      - admin-service
     networks: [kissan]
 
 volumes:

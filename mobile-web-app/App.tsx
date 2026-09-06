@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { View, I18nManager } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
@@ -18,13 +18,16 @@ import HelplineScreen from './src/screens/HelplineScreen';
 import FaqScreen from './src/screens/FaqScreen';
 import VoiceCallScreen from './src/screens/VoiceCallScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import AdminLoginScreen from './src/screens/admin/AdminLoginScreen';
+import AdminDashboardScreen from './src/screens/admin/AdminDashboardScreen';
+import { isAdminLoggedIn } from './src/services/adminService';
 
 // Keep native splash visible while app initializes
 SplashScreen.preventAutoHideAsync().catch(() => {
   // On web or if native splash isn't configured, this may fail — safe to ignore
 });
 
-type Screen = 'loading' | 'splash' | 'onboarding' | 'language' | 'login' | 'home' | 'disease' | 'history' | 'weather' | 'market' | 'helpline' | 'voice-call' | 'settings' | 'faq';
+type Screen = 'loading' | 'splash' | 'onboarding' | 'language' | 'login' | 'home' | 'disease' | 'history' | 'weather' | 'market' | 'helpline' | 'voice-call' | 'settings' | 'faq' | 'admin-login' | 'admin-dashboard';
 
 export default function App() {
   return (
@@ -38,7 +41,16 @@ export default function App() {
 
 function AppInner() {
   const { colors } = useTheme();
-  const [currentScreen, setCurrentScreen] = useState<Screen>('loading');
+
+  // Stable callback for admin logout — clears hash and goes to login
+  const handleAdminLogout = useCallback(() => {
+    if (typeof window !== 'undefined') window.location.hash = '';
+    setCurrentScreen('login');
+  }, []);
+
+  // Check admin hash IMMEDIATELY (synchronous) before any async work
+  const isAdminRoute = typeof window !== 'undefined' && window.location.hash === '#admin';
+  const [currentScreen, setCurrentScreen] = useState<Screen>(isAdminRoute ? (isAdminLoggedIn() ? 'admin-dashboard' : 'admin-login') : 'loading');
 
   useEffect(() => {
     // ─── Restore session on app start ───
@@ -60,6 +72,24 @@ function AppInner() {
         if (I18nManager.isRTL !== rtl) {
           I18nManager.forceRTL(rtl);
         }
+      }
+
+      // Check if admin panel is requested via URL hash
+      if (isAdminRoute) {
+        // Verify admin token is still valid (not expired)
+        if (!isAdminLoggedIn()) {
+          console.log('[App] Admin route but token expired/missing → login');
+          setCurrentScreen('login');
+        }
+        // else: already set by initial state — stay on admin-dashboard
+        return;
+      }
+
+      // Check if admin session exists (survives page refresh)
+      if (isAdminLoggedIn()) {
+        console.log('[App] Admin token found — restoring admin dashboard');
+        setCurrentScreen('admin-dashboard');
+        return;
       }
 
       const hasValidToken = await tokenStorage.isTokenValid();
@@ -102,7 +132,13 @@ function AppInner() {
       return <LanguageSelectionScreen onComplete={() => setCurrentScreen('login')} />;
     }
     if (currentScreen === 'login') {
-      return <LoginSignupScreen onComplete={() => setCurrentScreen('home')} />;
+      return <LoginSignupScreen onComplete={(mode) => {
+        if (mode === 'admin-login') {
+          setCurrentScreen('admin-dashboard');
+        } else {
+          setCurrentScreen('home');
+        }
+      }} />;
     }
     if (currentScreen === 'disease') {
       return <DiseaseScanScreen onNavigate={(s) => setCurrentScreen(s as Screen)} />;
@@ -127,6 +163,12 @@ function AppInner() {
     }
     if (currentScreen === 'faq') {
       return <FaqScreen onNavigate={(s) => setCurrentScreen(s as Screen)} />;
+    }
+    if (currentScreen === 'admin-login') {
+      return <AdminLoginScreen onLogin={() => setCurrentScreen('admin-dashboard')} onBack={() => { if (typeof window !== 'undefined') window.location.hash = ''; setCurrentScreen('login'); }} />;
+    }
+    if (currentScreen === 'admin-dashboard') {
+      return <AdminDashboardScreen onLogout={handleAdminLogout} />;
     }
     return <HomeDashboard onNavigate={(s) => setCurrentScreen(s as Screen)} />;
   };

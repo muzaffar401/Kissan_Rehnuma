@@ -11,7 +11,7 @@ class Farmer(Base):
 
     name = Column(String(50), nullable=False)
     email = Column(String(50), nullable=False, unique=True)
-    lastname = Column(String(50), nullable=False)
+    lastname = Column(String(50), nullable=True, default="")
 
     cnic = Column(String(20), nullable=False, unique=True)
 
@@ -23,15 +23,16 @@ class Farmer(Base):
 
     Address = Column(
         String(100),
-        nullable=False
+        nullable=True,
+        default=""
     )
 
-    City = Column(String(50), nullable=False)
+    City = Column(String(50), nullable=True, default="")
 
-    country = Column(String(50), nullable=False)
+    country = Column(String(50), nullable=True, default="Pakistan")
 
-    latitude = Column(Float, nullable=False)
-    longitude = Column(Float, nullable=False)
+    latitude = Column(Float, nullable=True, default=0.0)
+    longitude = Column(Float, nullable=True, default=0.0)
 
     password_hash = Column(String(255), nullable=False)
 
@@ -39,4 +40,10 @@ class Farmer(Base):
         Boolean,
         nullable=False,
         default=False
+    )
+
+    is_active = Column(
+        Boolean,
+        nullable=False,
+        default=True
     )

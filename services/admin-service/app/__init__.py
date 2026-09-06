@@ -1,0 +1,1 @@
+"""Kissan Rehnuma Admin Service."""

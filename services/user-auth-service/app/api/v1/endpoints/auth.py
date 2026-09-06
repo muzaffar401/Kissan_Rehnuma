@@ -301,6 +301,16 @@ def login(
             detail="Please verify your email before login"
         )
 
+    # ---------------------------------------------------------
+    # CHECK ACCOUNT ACTIVE
+    # ---------------------------------------------------------
+
+    if not getattr(farmer, 'is_active', True):
+        raise HTTPException(
+            status_code=403,
+            detail="Your account has been disabled by the administrator"
+        )
+
     # Ensure location is registered for weather alerts
     _ensure_farmer_location(db, farmer.id, farmer.latitude, farmer.longitude)
 
