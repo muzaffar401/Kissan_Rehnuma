@@ -4,15 +4,14 @@
  */
 
 const getAdminBaseUrl = (): string => {
-  // Admin API is always at the same host under /admin-api/admin/ via nginx
-  // nginx strips /admin-api/ prefix → admin-service receives /admin/...
+  // Admin API goes through the same cloudflare tunnel as the gateway in production
+  if (!__DEV__) {
+    // Production: use the same cloudflare tunnel URL as the gateway
+    return 'https://tax-contracting-misc-deserve.trycloudflare.com/admin-api/admin';
+  }
+  // Dev mode: go through nginx on port 80
   if (typeof window !== 'undefined' && window.location) {
     const { protocol, hostname } = window.location;
-    // Dev mode: go through nginx on port 80
-    if (__DEV__) {
-      return 'http://localhost/admin-api/admin';
-    }
-    // Production: same host, /admin-api/ prefix via nginx
     return `${protocol}//${hostname}/admin-api/admin`;
   }
   return 'http://localhost/admin-api/admin';
