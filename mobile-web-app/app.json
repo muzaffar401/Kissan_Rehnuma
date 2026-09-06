@@ -20,15 +20,15 @@
       "package": "com.muzaffar401.kissanrehnuma"
     },
     "web": {
-      "favicon": "../../assets/logo.png"
+      "favicon": "./assets/logo.png"
     },
     "plugins": [
       "expo-font",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/logo.jpg",
-          "imageWidth": 128,
+          "image": "./assets/logo.png",
+          "imageWidth": 200,
           "backgroundColor": "#4a6b57",
           "resizeMode": "contain"
         }
