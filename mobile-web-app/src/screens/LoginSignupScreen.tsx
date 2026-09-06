@@ -26,9 +26,11 @@ import { useTheme } from '../theme/ThemeContext';
 import type { ColorPalette } from '../theme/colors';
 import { useTranslation } from 'react-i18next';
 import { authService } from '../services/authService';
+import { adminLogin } from '../services/adminService';
 import { weatherService } from '../services/weatherService';
 import { tokenStorage } from '../services/tokenStorage';
 import * as Location from 'expo-location';
+import { Eye, EyeOff } from 'lucide-react-native';
 import {
   validateEmail,
   validatePassword,
@@ -61,7 +63,7 @@ async function getDeviceLocation(): Promise<{ latitude: number; longitude: numbe
 }
 
 interface LoginSignupScreenProps {
-  onComplete: (mode: 'login' | 'signup') => void;
+  onComplete: (mode: 'login' | 'signup' | 'admin-login') => void;
 }
 
 function FormInput({
@@ -82,6 +84,9 @@ function FormInput({
   const { colors } = useTheme();
   const inpStyles = createInputStyles(colors);
   const borderColor = useRef(new Animated.Value(0)).current;
+  const [hidden, setHidden] = useState(true);
+  const isPassword = !!secureTextEntry;
+  const actualSecure = isPassword ? hidden : false;
 
   const animateFocus = (isFocused: boolean) => {
     Animated.timing(borderColor, {
@@ -102,10 +107,10 @@ function FormInput({
       <Text style={inpStyles.label}>{label}</Text>
       <Animated.View style={[inpStyles.inputWrapper, { borderColor: interpolatedBorder }]}>
         <TextInput
-          style={inpStyles.input}
+          style={[inpStyles.input, isPassword && { paddingRight: 48 }]}
           placeholder={placeholder}
           placeholderTextColor={colors.outlineVariant}
-          secureTextEntry={secureTextEntry}
+          secureTextEntry={actualSecure}
           keyboardType={keyboardType || 'default'}
           value={value}
           onChangeText={onChangeText}
@@ -113,6 +118,18 @@ function FormInput({
           onBlur={() => animateFocus(false)}
           autoCapitalize="none"
         />
+        {isPassword && (
+          <Pressable
+            onPress={() => setHidden((v) => !v)}
+            hitSlop={8}
+            style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}
+          >
+            {hidden
+              ? <Eye size={20} color={colors.outlineVariant} />
+              : <EyeOff size={20} color={colors.outlineVariant} />
+            }
+          </Pressable>
+        )}
       </Animated.View>
     </View>
   );
@@ -311,6 +328,15 @@ export default function LoginSignupScreen({ onComplete }: LoginSignupScreenProps
     setLoading(true);
     setError('');
     try {
+      // First try admin login — if credentials match admin, open admin panel
+      try {
+        await adminLogin(loginEmail.trim(), loginPassword);
+        onComplete('admin-login');
+        return;
+      } catch {
+        // Not admin credentials — fall through to normal farmer login
+      }
+
       await authService.login({ email: loginEmail.trim(), password: loginPassword });
       onComplete('login');
     } catch (e: any) {
