@@ -23,7 +23,7 @@ import {
   LayoutGrid, Users, Leaf, PawPrint, Phone, MessagesSquare, ScrollText,
   Menu, X, LogOut, Search, SlidersHorizontal, ChevronRight, ChevronDown,
   TrendingUp, MessageCircleWarning, UserPlus, Sun, Moon, ChevronLeft,
-  Pencil, Trash2, UserCheck, UserX,
+  Pencil, Trash2, UserCheck, UserX, MoreVertical,
 } from 'lucide-react-native';
 import { useTheme } from '../../theme/ThemeContext';
 import {
@@ -329,6 +329,7 @@ function UsersSection({ C }: { C: Colors }) {
   const [saving, setSaving] = useState(false);
   const [targetUser, setTargetUser] = useState<any>(null);
   const [toggling, setToggling] = useState(false);
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -381,27 +382,46 @@ function UsersSection({ C }: { C: Colors }) {
           {data.items.map((u: any) => {
             const active = u.is_active !== false;
             return (
-              <View key={u.id} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                <View style={{ flex: 1 }}>
-                  <ListCard C={C}
-                    title={`${u.name} ${u.lastname}`}
-                    subtitle={`${u.City ?? ''}${u.City && u.country ? ', ' : ''}${u.country ?? ''}`}
-                    badge={{ text: !active ? 'disabled' : u.email_verified ? 'verified' : 'pending', tone: !active ? 'clay' : u.email_verified ? 'crop' : 'wheat' }}
-                    fields={[{ label: 'Email', value: u.email ?? '—' }, { label: 'Phone', value: u.Mobile_Number ?? '—' }]}
-                  />
-                </View>
-                <View style={{ marginLeft: 4, gap: 6 }}>
-                  <Pressable onPress={() => setEditUser({
-                    ...u,
-                    _name: u.name, _lastname: u.lastname, _email: u.email,
-                    _Mobile_Number: u.Mobile_Number, _City: u.City, _country: u.country,
-                  })} style={{ padding: 8, borderRadius: 8, backgroundColor: C.soilCard }}>
-                    <Pencil size={16} color={C.crop} />
-                  </Pressable>
-                  <Pressable onPress={() => handleDisable(u)} style={{ padding: 8, borderRadius: 8, backgroundColor: C.soilCard }}>
-                    {active ? <UserX size={16} color={C.clay} /> : <UserCheck size={16} color={C.crop} />}
-                  </Pressable>
-                </View>
+              <View key={u.id} style={{ marginBottom: 8, zIndex: activeDropdown === u.id ? 100 : 1 }}>
+                <ListCard C={C}
+                  title={`${u.name} ${u.lastname}`}
+                  subtitle={`${u.City ?? ''}${u.City && u.country ? ', ' : ''}${u.country ?? ''}`}
+                  badge={{ text: !active ? 'disabled' : u.email_verified ? 'verified' : 'pending', tone: !active ? 'clay' : u.email_verified ? 'crop' : 'wheat' }}
+                  fields={[{ label: 'Email', value: u.email ?? '—' }, { label: 'Phone', value: u.Mobile_Number ?? '—' }]}
+                  rightAction={
+                    <View style={{ zIndex: activeDropdown === u.id ? 100 : 1 }}>
+                      <Pressable onPress={() => setActiveDropdown(activeDropdown === u.id ? null : u.id)} style={{ padding: 4, marginLeft: 8 }}>
+                        <MoreVertical size={20} color={C.inkFaint} />
+                      </Pressable>
+                      
+                      {activeDropdown === u.id && (
+                        <View style={{ 
+                          position: 'absolute', right: 0, top: 32, 
+                          backgroundColor: C.soilCard, borderRadius: 12, padding: 4, 
+                          elevation: 5, shadowColor: '#000', shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.2, shadowRadius: 8, 
+                          minWidth: 160, borderWidth: 1, borderColor: C.soilLine 
+                        }}>
+                          <Pressable onPress={() => { 
+                            setActiveDropdown(null); 
+                            setEditUser({
+                              ...u,
+                              _name: u.name, _lastname: u.lastname, _email: u.email,
+                              _Mobile_Number: u.Mobile_Number, _City: u.City, _country: u.country,
+                            }); 
+                          }} style={{ flexDirection: 'row', alignItems: 'center', padding: 12, gap: 12 }}>
+                            <Pencil size={16} color={C.crop} />
+                            <Text style={{ fontFamily: 'BeVietnamPro_500Medium', color: C.ink, fontSize: 14 }}>Edit User</Text>
+                          </Pressable>
+                          <View style={{ height: 1, backgroundColor: C.soilLine, marginHorizontal: 4 }} />
+                          <Pressable onPress={() => { setActiveDropdown(null); handleDisable(u); }} style={{ flexDirection: 'row', alignItems: 'center', padding: 12, gap: 12 }}>
+                            {active ? <UserX size={16} color={C.clay} /> : <UserCheck size={16} color={C.crop} />}
+                            <Text style={{ fontFamily: 'BeVietnamPro_500Medium', color: active ? C.clay : C.crop, fontSize: 14 }}>{active ? 'Disable User' : 'Enable User'}</Text>
+                          </Pressable>
+                        </View>
+                      )}
+                    </View>
+                  }
+                />
               </View>
             );
           })}
@@ -1286,35 +1306,39 @@ function SearchBar({ C, value, onChangeText, placeholder, onFilterPress, filterA
   );
 }
 
-function ListCard({ C, title, subtitle, badge, fields, onPress, imageUrl }: {
+function ListCard({ C, title, subtitle, badge, fields, onPress, imageUrl, rightAction }: {
   C: Colors; title: string; subtitle?: string;
   badge?: { text: string; tone: string };
   fields: { label: string; value: string }[];
   onPress?: () => void;
   imageUrl?: string;
+  rightAction?: React.ReactNode;
 }) {
   const bb = badgeBg(C), bc = badgeClr(C);
   
   const content = (
-    <View style={[styles.card, { backgroundColor: C.soilCard, overflow: 'hidden', padding: 0 }]}>
+    <View style={[styles.card, { backgroundColor: C.soilCard, overflow: 'visible', padding: 0 }]}>
       {imageUrl && (
         <Image 
           source={{ uri: imageUrl }}
-          style={{ width: '100%', height: 200, backgroundColor: C.soilLine }}
+          style={{ width: '100%', height: 200, backgroundColor: C.soilLine, borderTopLeftRadius: 18, borderTopRightRadius: 18 }}
           resizeMode="cover"
         />
       )}
-      <View style={{ padding: 16 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <View style={{ padding: 16, zIndex: 10 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', zIndex: 10 }}>
         <View style={{ flex: 1, paddingRight: 8 }}>
           <Text style={[styles.cardTitle, { color: C.ink }]} numberOfLines={1}>{title}</Text>
           {subtitle ? <Text style={[styles.cardSub, { color: C.inkMuted }]} numberOfLines={1}>{subtitle}</Text> : null}
         </View>
-        {badge && (
-          <View style={[styles.badge, { backgroundColor: bb[badge.tone] ?? bb.crop }]}>
-            <Text style={[styles.badgeTxt, { color: bc[badge.tone] ?? bc.crop }]}>{badge.text}</Text>
-          </View>
-        )}
+        <View style={{ flexDirection: 'row', alignItems: 'center', zIndex: 20 }}>
+          {badge && (
+            <View style={[styles.badge, { backgroundColor: bb[badge.tone] ?? bb.crop }]}>
+              <Text style={[styles.badgeTxt, { color: bc[badge.tone] ?? bc.crop }]}>{badge.text}</Text>
+            </View>
+          )}
+          {rightAction}
+        </View>
       </View>
       {fields.length > 0 && (
         <View style={[styles.cardFields, { borderTopColor: C.soilLine }]}>
