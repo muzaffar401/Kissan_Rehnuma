@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="mobile-web-app/assets/logo.jpg" alt="Kissan Rehnuma" width="120" />
+  <img src="mobile-web-app/assets/logo.png" alt="Kissan Rehnuma" width="120" />
 </p>
 
 <h1 align="center">Kissan Rehnuma</h1>
