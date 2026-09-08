@@ -39,6 +39,7 @@ import type { RemoteTrack, TrackPublication, Participant } from 'livekit-client'
 import { useTheme } from '../theme/ThemeContext';
 import type { ColorPalette } from '../theme/colors';
 import { useTranslation } from 'react-i18next';
+import i18n from '../i18n';
 import { tokenStorage } from '../services/tokenStorage';
 import { fetchVoiceToken, generateRoomName } from '../services/helplineService';
 import { LIVEKIT_URL } from '../services/config';
@@ -247,8 +248,14 @@ export default function VoiceCallScreen({ onNavigate }: VoiceCallScreenProps) {
 
       console.log('[VoiceCall] Starting call:', { farmerId, farmerName, roomName });
 
-      const { token } = await fetchVoiceToken(identity, roomName, farmerId, farmerName ?? null);
-      console.log('[VoiceCall] Token received, agent dispatched with farmer info');
+      const { token } = await fetchVoiceToken(
+        identity,
+        roomName,
+        farmerId,
+        farmerName ?? null,
+        i18n.language,
+      );
+      console.log('[VoiceCall] Token received, agent dispatched with farmer info and language:', i18n.language);
 
       setCallState('connecting');
 

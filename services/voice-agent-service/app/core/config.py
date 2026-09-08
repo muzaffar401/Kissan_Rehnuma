@@ -43,10 +43,10 @@ class Settings(BaseSettings):
     # Deepgram (STT)
     deepgram_api_key: SecretStr = Field(min_length=1)
 
-    # Uplift AI (TTS)
+    # Uplift AI (TTS — Urdu only; English uses LiveKit Inference Deepgram Aura-2)
     uplift_api_key: SecretStr = Field(min_length=1)
     uplift_tts_base_url: str = "https://api.upliftai.org/v1/synthesis/text-to-speech"
-    uplift_voice_id: str = "v_8eelc901"  # Info/Edu voice
+    uplift_voice_id: str = "v_8eelc901"  # Info/Edu voice (Urdu)
     uplift_output_format: str = "WAV_22050_16"
 
     # Service-to-service (internal calls to other microservices)

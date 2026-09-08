@@ -29,12 +29,14 @@ export function generateRoomName(): string {
  * @param roomName  LiveKit room name
  * @param farmerId  Real farmer UUID from the database
  * @param farmerName Farmer's display name for personalization
+ * @param language  Language code ('en', 'ur', 'sd') for voice agent
  */
 export async function fetchVoiceToken(
   identity: string,
   roomName: string,
   farmerId?: string | null,
   farmerName?: string | null,
+  language?: string | null,
 ): Promise<VoiceTokenResponse> {
   const params = new URLSearchParams({
     identity,
@@ -46,6 +48,9 @@ export async function fetchVoiceToken(
   }
   if (farmerName) {
     params.append('farmer_name', farmerName);
+  }
+  if (language) {
+    params.append('language', language);
   }
 
   const url = `${TOKEN_SERVER_URL}/?${params.toString()}`;

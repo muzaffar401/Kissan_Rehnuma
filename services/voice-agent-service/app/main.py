@@ -5,6 +5,7 @@ real-time voice conversations with farmers using:
 - Deepgram STT (speech-to-text)
 - OpenRouter LLM (GPT-4o, Gemini, etc.)
 - Uplift AI TTS (Urdu text-to-speech)
+- LiveKit Inference TTS — Deepgram Aura-2 Athena (English text-to-speech)
 - Custom tools for complaint registration, weather, market rates
 
 Latency optimizations applied (Ref: LiveKit latency guide):
@@ -76,9 +77,10 @@ server.setup_fnc = prewarm
 async def entrypoint(ctx: agents.JobContext):
     """Main entry point for each LiveKit room session."""
 
-    # Extract farmer_id and farmer_name from job metadata (set by token_server)
+    # Extract farmer_id, farmer_name, and language from job metadata (set by token_server)
     real_farmer_id = None
     farmer_name = "kissan"  # default
+    language = "ur"  # default: Urdu
     try:
         metadata = ctx.job.metadata
         if metadata:
@@ -86,9 +88,21 @@ async def entrypoint(ctx: agents.JobContext):
             meta_dict = _json.loads(metadata)
             real_farmer_id = meta_dict.get("farmer_id")
             farmer_name = meta_dict.get("farmer_name") or "kissan"
+            language = meta_dict.get("language") or "ur"
+            # Normalize language code (frontend sends 'en', 'ur', 'sd')
+            if language not in ("ur", "en"):
+                logger.warning(
+                    "Unsupported language, falling back to Urdu",
+                    extra={"language": language},
+                )
+                language = "ur"
             logger.info(
                 "Job metadata parsed",
-                extra={"real_farmer_id": real_farmer_id, "farmer_name": farmer_name},
+                extra={
+                    "real_farmer_id": real_farmer_id,
+                    "farmer_name": farmer_name,
+                    "language": language,
+                },
             )
     except Exception as e:
         logger.warning("Failed to parse job metadata", extra={"error": str(e)})
@@ -144,17 +158,33 @@ async def entrypoint(ctx: agents.JobContext):
     else:
         logger.info("No past memories found for farmer", extra={"farmer_id": str(farmer_id)})
 
-    # Use pre-warmed TTS from worker process (avoids cold-start latency)
-    # Falls back to creating new TTS if prewarm didn't run
+    # Map language to Deepgram STT language code
+    # Ref: https://developers.deepgram.com/docs/models-languages-overview
+    stt_language = "en" if language == "en" else "ur"
+
+    # Select TTS based on language
+    # Urdu: Uplift AI (Pakistani-accented, pre-warmed in worker)
+    # English: LiveKit Inference — Deepgram Aura-2 Athena (professional female)
     tts = ctx.proc.userdata.get("tts")
-    if tts is None:
-        logger.warning("TTS not found in userdata, creating new instance")
+
+    if language == "en":
+        # English: use LiveKit Inference Deepgram Aura-2 (no prewarm needed)
+        logger.info("Creating English TTS (LiveKit Inference Deepgram Aura-2 Athena)")
+        tts = inference.TTS(
+            model="deepgram/aura-2",
+            voice="athena",
+            language="en",
+        )
+    elif tts is None:
+        logger.warning("TTS not found in userdata, creating new Urdu TTS instance")
         tts = upliftai.TTS(
             voice_id=settings.uplift_voice_id,
             output_format=settings.uplift_output_format,
             api_key=settings.uplift_api_key.get_secret_value(),
             word_tokenizer=tokenize.basic.SentenceTokenizer(),
         )
+    else:
+        logger.info("Using pre-warmed Urdu TTS", extra={"voice_id": settings.uplift_voice_id})
 
     # Track session start time for duration calculation
     session_start_time = _time.time()
@@ -166,7 +196,7 @@ async def entrypoint(ctx: agents.JobContext):
     session = AgentSession(
         stt=deepgram.STT(
             model="nova-3",
-            language="ur",
+            language=stt_language,
             # Enable interim results for faster partial transcripts
             # This allows preemptive generation to work effectively
         ),
@@ -211,7 +241,11 @@ async def entrypoint(ctx: agents.JobContext):
     # Start the session
     await session.start(
         room=ctx.room,
-        agent=KissanRehnumaAgent(farmer_name=farmer_name, farmer_memory=farmer_memory),
+        agent=KissanRehnumaAgent(
+            farmer_name=farmer_name,
+            farmer_memory=farmer_memory,
+            language=language,
+        ),
         room_input_options=RoomInputOptions(),
     )
 

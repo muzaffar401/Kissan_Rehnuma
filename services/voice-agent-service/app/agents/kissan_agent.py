@@ -20,11 +20,17 @@ from app.agents.tools import (
 class KissanRehnumaAgent(Agent):
     """The main Kissan Rehnuma voice agent."""
 
-    def __init__(self, farmer_name: str = "kissan", farmer_memory: str = "") -> None:
+    def __init__(
+        self,
+        farmer_name: str = "kissan",
+        farmer_memory: str = "",
+        language: str = "ur",
+    ) -> None:
         super().__init__(
             instructions=build_instructions(
                 farmer_name=farmer_name,
                 farmer_memory=farmer_memory,
+                language=language,
             ),
             tools=[
                 register_complaint,
@@ -34,17 +40,27 @@ class KissanRehnumaAgent(Agent):
             ],
         )
         self._farmer_name = farmer_name
+        self._language = language
 
     async def on_enter(self) -> None:
         """Called when the agent becomes active in a session."""
         name = self._farmer_name
-        await self.session.generate_reply(
-            instructions=(
-                f"Greet the farmer warmly in Urdu script. "
-                f"Address them as '{name} sahib'. "
-                f"Introduce yourself as Kissan Rehnuma and ask how you can help."
+        if self._language == "en":
+            await self.session.generate_reply(
+                instructions=(
+                    f"Greet the farmer warmly in English. "
+                    f"Address them as '{name}'. "
+                    f"Introduce yourself as Kissan Rehnuma and ask how you can help."
+                )
             )
-        )
+        else:
+            await self.session.generate_reply(
+                instructions=(
+                    f"Greet the farmer warmly in Urdu script. "
+                    f"Address them as '{name} sahib'. "
+                    f"Introduce yourself as Kissan Rehnuma and ask how you can help."
+                )
+            )
 
     async def on_event(self, event: object) -> None:
         """Handle agent lifecycle events."""

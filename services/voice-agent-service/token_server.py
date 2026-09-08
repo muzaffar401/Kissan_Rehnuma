@@ -34,6 +34,7 @@ class TokenHandler(BaseHTTPRequestHandler):
         room_name = params.get('room', ['test_room'])[0]
         farmer_id = params.get('farmer_id', [None])[0]
         farmer_name = params.get('farmer_name', [''])[0] or 'kissan'
+        language = params.get('language', ['ur'])[0] or 'ur'
 
         # Clear log so we can see if the frontend actually sent the name
         if farmer_name and farmer_name != 'kissan':
@@ -49,7 +50,7 @@ class TokenHandler(BaseHTTPRequestHandler):
         threading.Thread(
             target=self._dispatch_agent,
             args=(room_name,),
-            kwargs={'farmer_id': farmer_id, 'farmer_name': farmer_name},
+            kwargs={'farmer_id': farmer_id, 'farmer_name': farmer_name, 'language': language},
             daemon=True,
         ).start()
 
@@ -66,7 +67,7 @@ class TokenHandler(BaseHTTPRequestHandler):
         }
         self.wfile.write(json.dumps(response).encode())
 
-        print(f"✓ Token generated for {identity} in room {room_name} (farmer_id={farmer_id}, name={farmer_name!r})")
+        print(f"✓ Token generated for {identity} in room {room_name} (farmer_id={farmer_id}, name={farmer_name!r}, lang={language})")
     
     def _generate_token(self, identity: str, room_name: str) -> str:
         """Generate a LiveKit access token."""
@@ -94,7 +95,7 @@ class TokenHandler(BaseHTTPRequestHandler):
         
         return token.to_jwt()
     
-    def _dispatch_agent(self, room_name: str, farmer_id: str = None, farmer_name: str = None) -> None:
+    def _dispatch_agent(self, room_name: str, farmer_id: str = None, farmer_name: str = None, language: str = "ur") -> None:
         """Dispatch an agent to the room using LiveKit API."""
         import os
         import requests
@@ -143,18 +144,18 @@ class TokenHandler(BaseHTTPRequestHandler):
                 "room": room_name,
                 "agentName": "kissan-rehnuma",
             }
-            # Build metadata with farmer info for the agent
+            # Build metadata with farmer info and language for the agent
             meta = {}
             if farmer_id:
                 meta["farmer_id"] = farmer_id
             if farmer_name:
                 meta["farmer_name"] = farmer_name
-            if meta:
-                data["metadata"] = json.dumps(meta)
+            meta["language"] = language
+            data["metadata"] = json.dumps(meta)
 
             response = requests.post(dispatch_url, headers=headers, json=data, timeout=5)
             if response.status_code == 200:
-                print(f"✓ Agent dispatched to room: {room_name} (farmer_id={farmer_id}, name={farmer_name})")
+                print(f"✓ Agent dispatched to room: {room_name} (farmer_id={farmer_id}, name={farmer_name}, lang={language})")
             else:
                 print(f"⚠ Agent dispatch failed: {response.status_code} - {response.text}")
         except ImportError:
