@@ -36,7 +36,9 @@ interface WeatherScreenProps {
   onNavigate?: (screen: string) => void;
 }
 
-const BOTTOM_TABS: { key: BottomTab; icon: string; labelKey: string }[] = [
+const SHOW_ALERT_HISTORY = false;
+
+const BOTTOM_TABS:{ key: BottomTab; icon: string; labelKey: string }[] = [
   { key: 'home', icon: 'home', labelKey: 'common.nav.home' },
   { key: 'disease', icon: 'leaf', labelKey: 'common.nav.disease' },
   { key: 'weather', icon: 'weather-sunny', labelKey: 'common.nav.weather' },
@@ -217,8 +219,8 @@ export default function WeatherScreen({ onNavigate }: WeatherScreenProps) {
               </View>
             </View>
 
-            {/* Alert History */}
-            {alerts.length > 0 && (
+            {/* Alert History — temporarily hidden for the presentation; set SHOW_ALERT_HISTORY to true to re-enable */}
+            {SHOW_ALERT_HISTORY && alerts.length > 0 && (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>{t('weather.weatherAlerts')}</Text>
                 {alerts.map((alert, idx) => (
