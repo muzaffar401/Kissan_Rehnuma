@@ -7,6 +7,7 @@ service-to-service utilities (JWT generation, HTTP session pooling).
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from contextvars import ContextVar
 from uuid import UUID, uuid4
 
 import aiohttp
@@ -31,18 +32,18 @@ class SessionContext:
 
 
 # Thread-local-like context set per room session
-_current_context: SessionContext | None = None
+_current_context: ContextVar[SessionContext | None] = ContextVar("voice_session_context", default=None)
 
 
 def set_session_context(ctx: SessionContext) -> None:
-    global _current_context
-    _current_context = ctx
+    _current_context.set(ctx)
 
 
 def get_session_context() -> SessionContext:
-    if _current_context is None:
+    ctx = _current_context.get()
+    if ctx is None:
         raise RuntimeError("Session context not set. Call set_session_context first.")
-    return _current_context
+    return ctx
 
 
 # ---------------------------------------------------------------------------

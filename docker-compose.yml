@@ -49,7 +49,7 @@ services:
       APP_ENV: production
       DEBUG: "false"
       PORT: 8002
-      DATABASE_URL: postgresql://kissan:${POSTGRES_PASSWORD}@postgres:5432/kissan_auth
+      DATABASE_URL: postgresql+psycopg2://kissan:${POSTGRES_PASSWORD}@postgres:5432/kissan_auth
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}
       JWT_EXPIRY_MINUTES: "1440"
       # Brevo transactional email (HTTP API — works everywhere)
@@ -132,7 +132,7 @@ services:
       APP_ENV: production
       DEBUG: "false"
       PORT: 8004
-      DATABASE_URL: postgresql://kissan:${POSTGRES_PASSWORD}@postgres:5432/kissan_auth
+      DATABASE_URL: postgresql+psycopg2://kissan:${POSTGRES_PASSWORD}@postgres:5432/kissan_auth
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}
       SCHEDULER_ENABLED: ${SCHEDULER_ENABLED:-true}
       SCHEDULER_INTERVAL_MINUTES: "30"
@@ -157,7 +157,7 @@ services:
     restart: unless-stopped
     environment:
       PORT: 8005
-      DATABASE_URL: postgresql://kissan:${POSTGRES_PASSWORD}@postgres:5432/kissan_auth
+      DATABASE_URL: postgresql+psycopg2://kissan:${POSTGRES_PASSWORD}@postgres:5432/kissan_auth
       ADMIN_API_KEY: ${ADMIN_API_KEY:-}
       SCHEDULER_ENABLED: "true"
       SCHEDULER_HOUR: "7"
@@ -191,6 +191,8 @@ services:
       UPLIFT_VOICE_ID: v_8eelc901
       UPLIFT_OUTPUT_FORMAT: MP3_22050_32
       # Internal docker-network service URLs (agent tools call these)
+      CROP_DISEASE_SERVICE_URL: http://crop-disease:8001
+      ANIMAL_DISEASE_SERVICE_URL: http://animal-disease:8003
       WEATHER_SERVICE_URL: http://weather-alert:8004
       MARKET_RATE_SERVICE_URL: http://market-rate:8005
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}
@@ -209,6 +211,8 @@ services:
     restart: unless-stopped
     command: ["token-server"]
     environment:
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}
+      JWT_ALGORITHM: HS256
       LIVEKIT_URL: ${LIVEKIT_URL:?Set LIVEKIT_URL in .env}
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?Set LIVEKIT_API_KEY in .env}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?Set LIVEKIT_API_SECRET in .env}
@@ -283,6 +287,28 @@ services:
     depends_on:
       - api-gateway
       - admin-service
+    networks: [kissan]
+
+  # Optional mobile browser test link; start with --profile mobile-test.
+  mobile-preview:
+    image: nginx:1.27-alpine
+    profiles: [mobile-test]
+    ports:
+      - "127.0.0.1:8090:80"
+    volumes:
+      - ./mobile-web-app/.expo/mobile-preview:/usr/share/nginx/html:ro
+      - ./infra/docker/nginx/mobile-preview.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - api-gateway
+      - voice-token
+    networks: [kissan]
+
+  mobile-tunnel:
+    image: cloudflare/cloudflared:latest
+    profiles: [mobile-test]
+    command: [tunnel, --no-autoupdate, --url, http://mobile-preview:80]
+    depends_on:
+      - mobile-preview
     networks: [kissan]
 
 volumes:

@@ -1,0 +1,47 @@
+{
+  "en": {
+    "cropPhotoTitle": "Photo of the affected crop", "animalPhotoTitle": "Photo of the affected animal", "photoHint": "Take a clear, close photo in good light.",
+    "preview": "Send this photo?", "sendPhoto": "Send photo for assessment", "changePhoto": "Choose a different photo", "noPhoto": "I don't have a photo now",
+    "analyzing": "Checking your photo…", "stayOnCall": "Stay on the call. Your assistant will explain the result.",
+    "voiceDetails": "Tell your assistant the details. Your request will be filled in as you speak.", "typeInstead": "I'd rather type the details", "reviewDestination": "Your request will go to the Kissan Rehnuma team for review.", "syncError": "Screen connection needs attention. Use the refresh icon above.",
+    "title": "Help during your call", "destination": "Requests go to the Kissan Rehnuma team for review. They are not submitted to an NGO.",
+    "connect": "Connect assistant", "crop": "Crop", "animal": "Animal", "cropPhoto": "Upload a clear photo of the affected crop.", "animalPhoto": "Upload a clear photo of the affected animal.",
+    "upload": "Choose photo", "camera": "Take photo", "photo": "Selected photo", "analyze": "Analyze photo", "shareResult": "Share saved result with assistant",
+    "assessment": "Photo assessment", "unconfirmed": "Possible signs only — expert confirmation required.", "retake": "A reliable assessment is unavailable. Try a clearer photo or request expert review.",
+    "expert": "Expert review", "assistance": "Assistance request", "district": "District / city", "description": "Describe the problem (at least 10 characters)",
+    "review": "Review request", "confirmHint": "Confirm these details, or say: confirm request. Saying yes alone does not submit.", "confirm": "Confirm and send to our team", "cancel": "Cancel draft",
+    "recorded": "Request recorded", "tracking": "Save your reference. Ask the assistant about your request status. Assignment or assistance approval is confirmed separately.",
+    "status": { "registered": "Waiting for team review", "in_review": "Under review", "resolved": "Resolved", "closed": "Closed" },
+    "refresh": "Refresh request status", "working": "Working", "error": "Could not complete this step. Refresh to check the current request before retrying. Your saved photo result can be shared again without another analysis.", "cameraPermission": "Allow camera access to take a photo. You can also choose an existing photo."
+  },
+  "ur": {
+    "cropPhotoTitle": "متاثرہ فصل کی تصویر", "animalPhotoTitle": "متاثرہ جانور کی تصویر", "photoHint": "اچھی روشنی میں قریب سے واضح تصویر لیں۔",
+    "preview": "یہ تصویر بھیج دیں؟", "sendPhoto": "جائزے کے لیے تصویر بھیجیں", "changePhoto": "دوسری تصویر منتخب کریں", "noPhoto": "ابھی تصویر نہیں ہے",
+    "analyzing": "تصویر کا جائزہ جاری ہے…", "stayOnCall": "کال جاری رکھیں۔ اسسٹنٹ آپ کو نتیجہ بتائے گا۔",
+    "voiceDetails": "اسسٹنٹ کو تفصیلات بتائیں۔ آپ کی بات سے درخواست تیار ہوگی۔", "typeInstead": "تفصیلات لکھ کر دینا چاہتا ہوں", "reviewDestination": "آپ کی درخواست کسان رہنما ٹیم کے جائزے کے لیے بھیجی جائے گی۔", "syncError": "اسکرین کا رابطہ بحال کرنے کے لیے اوپر تازہ کریں کا نشان دبائیں۔",
+    "title": "کال کے دوران مدد", "destination": "درخواست کسان رہنما ٹیم کے جائزے کے لیے ہے۔ یہ کسی این جی او کو نہیں بھیجی جاتی۔",
+    "connect": "اسسٹنٹ سے رابطہ", "crop": "فصل", "animal": "جانور", "cropPhoto": "متاثرہ فصل کی واضح تصویر بھیجیں۔", "animalPhoto": "متاثرہ جانور کی واضح تصویر بھیجیں۔",
+    "upload": "تصویر منتخب کریں", "camera": "تصویر لیں", "photo": "منتخب تصویر", "analyze": "تصویر کا جائزہ", "shareResult": "محفوظ نتیجہ اسسٹنٹ کو بھیجیں",
+    "assessment": "تصویر کا جائزہ", "unconfirmed": "ممکنہ علامات — ماہر کی تصدیق ضروری ہے۔", "retake": "قابل اعتماد جائزہ دستیاب نہیں۔ واضح تصویر دیں یا ماہر سے جائزہ لیں۔",
+    "expert": "ماہر سے جائزہ", "assistance": "امداد کی درخواست", "district": "ضلع / شہر", "description": "مسئلہ بتائیں (کم از کم ۱۰ حروف)",
+    "review": "درخواست کا جائزہ", "confirmHint": "تفصیلات کی تصدیق کریں یا کہیں: درخواست جمع کریں۔ صرف ہاں کہنے سے درخواست جمع نہیں ہوگی۔", "confirm": "تصدیق کرکے ہماری ٹیم کو بھیجیں", "cancel": "مسودہ منسوخ کریں",
+    "recorded": "درخواست درج ہوگئی", "tracking": "حوالہ نمبر محفوظ کریں۔ اسسٹنٹ سے حالت پوچھیں۔ ماہر کی تقرری یا امداد کی منظوری الگ تصدیق ہوگی۔",
+    "status": { "registered": "ٹیم کے جائزے کا انتظار", "in_review": "جائزہ جاری ہے", "resolved": "حل ہوگئی", "closed": "بند ہوگئی" },
+    "refresh": "درخواست کی حالت تازہ کریں", "working": "کام جاری ہے", "error": "یہ مرحلہ مکمل نہیں ہوا۔ دوبارہ کوشش سے پہلے حالت تازہ کریں۔ محفوظ تصویری نتیجہ دوبارہ تجزیے کے بغیر بھیجا جا سکتا ہے۔", "cameraPermission": "تصویر لینے کے لیے کیمرے کی اجازت دیں یا موجودہ تصویر منتخب کریں۔"
+  },
+  "sd": {
+    "cropPhotoTitle": "متاثر فصل جي تصوير", "animalPhotoTitle": "متاثر جانور جي تصوير", "photoHint": "سٺي روشني ۾ ويجهڙائي کان صاف تصوير وٺو.",
+    "preview": "هي تصوير موڪليون؟", "sendPhoto": "جائزي لاءِ تصوير موڪليو", "changePhoto": "ٻي تصوير چونڊيو", "noPhoto": "هن وقت تصوير ناهي",
+    "analyzing": "تصوير جو جائزو جاري آهي…", "stayOnCall": "ڪال جاري رکو. اسسٽنٽ نتيجو ٻڌائيندو.",
+    "voiceDetails": "اسسٽنٽ کي تفصيل ٻڌايو. توهان جي ڳالهه مان درخواست تيار ٿيندي.", "typeInstead": "تفصيل لکي ڏيڻ چاهيان ٿو", "reviewDestination": "توهان جي درخواست ڪسان رهنما ٽيم جي جائزي لاءِ موڪلي ويندي.", "syncError": "اسڪرين جو رابطو بحال ڪرڻ لاءِ مٿي تازو ڪرڻ وارو نشان دٻايو.",
+    "title": "ڪال دوران مدد", "destination": "درخواست ڪسان رهنما ٽيم جي جائزي لاءِ آهي، ڪنهن اين جي او ڏانهن نه موڪلي ويندي.",
+    "connect": "اسسٽنٽ سان ڳنڍيو", "crop": "فصل", "animal": "جانور", "cropPhoto": "متاثر فصل جي صاف تصوير موڪليو.", "animalPhoto": "متاثر جانور جي صاف تصوير موڪليو.",
+    "upload": "تصوير چونڊيو", "camera": "تصوير وٺو", "photo": "چونڊيل تصوير", "analyze": "تصوير جو جائزو", "shareResult": "محفوظ نتيجو اسسٽنٽ کي موڪليو",
+    "assessment": "تصوير جو جائزو", "unconfirmed": "ممڪن علامتون — ماهر جي تصديق ضروري آهي.", "retake": "ڀروسي جوڳو جائزو موجود ناهي. صاف تصوير ڏيو يا ماهر کان مدد وٺو.",
+    "expert": "ماهر کان جائزو", "assistance": "امداد جي درخواست", "district": "ضلعو / شهر", "description": "مسئلو ٻڌايو (گهٽ ۾ گهٽ ۱۰ اکر)",
+    "review": "درخواست جو جائزو", "confirmHint": "تفصيلن جي تصديق ڪريو يا چئو: درخواست جمع کریں. رڳو ها چوڻ سان درخواست جمع نه ٿيندي.", "confirm": "تصديق ڪري اسان جي ٽيم کي موڪليو", "cancel": "مسودو رد ڪريو",
+    "recorded": "درخواست درج ٿي وئي", "tracking": "حوالو نمبر محفوظ ڪريو. اسسٽنٽ کان حالت پڇو. ماهر جي مقرري يا امداد جي منظوري الڳ تصديق ٿيندي.",
+    "status": { "registered": "ٽيم جي جائزي جو انتظار", "in_review": "جائزو جاري آهي", "resolved": "حل ٿي وئي", "closed": "بند ٿي وئي" },
+    "refresh": "درخواست جي حالت تازو ڪريو", "working": "ڪم جاري آهي", "error": "هي قدم مڪمل نه ٿيو. ٻيهر ڪوشش کان اڳ حالت تازو ڪريو. محفوظ نتيجو ٻيهر تجزيي کان سواءِ موڪلي سگهجي ٿو.", "cameraPermission": "تصوير وٺڻ لاءِ ڪئميرا جي اجازت ڏيو يا موجود تصوير چونڊيو."
+  }
+}

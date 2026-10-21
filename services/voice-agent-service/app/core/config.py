@@ -52,6 +52,8 @@ class Settings(BaseSettings):
     # Service-to-service (internal calls to other microservices)
     weather_service_url: str = "http://localhost:8004"
     market_rate_service_url: str = "http://localhost:8005"
+    crop_disease_service_url: str = "http://localhost:8001"
+    animal_disease_service_url: str = "http://localhost:8003"
     jwt_secret_key: str = "change-this-secret-key"  # shared with all services
     jwt_algorithm: str = "HS256"
 

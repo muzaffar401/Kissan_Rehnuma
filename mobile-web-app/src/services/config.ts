@@ -16,6 +16,9 @@
  * automatically connect to the correct gateway IP.
  */
 function getGatewayUrl(): string {
+  if (process.env.EXPO_PUBLIC_SAME_ORIGIN_API === 'true' && typeof window !== 'undefined') {
+    return window.location.origin;
+  }
   if (!__DEV__) {
     return 'https://tax-contracting-misc-deserve.trycloudflare.com';
   }
@@ -49,6 +52,9 @@ export const GATEWAY_HEALTH = `${GATEWAY_URL}/health`;
  * Runs on port 8080, same host as the gateway.
  */
 function getTokenServerUrl(): string {
+  if (process.env.EXPO_PUBLIC_SAME_ORIGIN_API === 'true' && typeof window !== 'undefined') {
+    return `${window.location.origin}/token`;
+  }
   if (!__DEV__) {
     return 'https://tax-contracting-misc-deserve.trycloudflare.com/token';
   }

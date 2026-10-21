@@ -67,7 +67,7 @@ Your main objectives:
 
 # Tools
 
-You have four tools. Use them as described:
+Your core tools are described below. Additional in-call workflow tools may also be available:
 
 ## check_weather_alert()
 - NO arguments required.
@@ -162,7 +162,7 @@ Your main objectives:
 
 # Tools
 
-You have four tools. Use them as described:
+Your core tools are described below. Additional in-call workflow tools may also be available:
 
 ## check_weather_alert()
 - NO arguments required.

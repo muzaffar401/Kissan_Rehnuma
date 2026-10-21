@@ -9,6 +9,10 @@ from urllib.parse import urlparse, parse_qs
 import json
 import sys
 import threading
+import os
+from uuid import uuid4
+from datetime import timedelta
+import jwt
 from pathlib import Path
 
 # Add parent directory to path to import app modules
@@ -23,24 +27,49 @@ from livekit import api
 class TokenHandler(BaseHTTPRequestHandler):
     """HTTP handler for generating LiveKit tokens."""
     
+    def _json_response(self, status, body):
+        self.send_response(status)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Cache-Control', 'no-store')
+        self.end_headers()
+        self.wfile.write(json.dumps(body).encode())
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type')
+        self.end_headers()
+
     def do_GET(self):
         """Handle GET requests for token generation."""
         # Parse query parameters
         parsed = urlparse(self.path)
         params = parse_qs(parsed.query)
         
-        # Extract identity from query string
-        identity = params.get('identity', ['test_farmer'])[0]
-        room_name = params.get('room', ['test_room'])[0]
-        farmer_id = params.get('farmer_id', [None])[0]
-        farmer_name = params.get('farmer_name', [''])[0] or 'kissan'
+        # Farmer identity and private room are server-controlled, never query-controlled.
+        secret = os.getenv('JWT_SECRET_KEY')
+        if not secret or secret == 'change-this-secret-key':
+            self._json_response(503, {'detail': 'Voice authentication is not configured'})
+            return
+        try:
+            authorization = self.headers.get('Authorization', '')
+            if not authorization.startswith('Bearer '):
+                raise ValueError('Missing access token')
+            claims = jwt.decode(authorization[7:], secret,
+                                algorithms=[os.getenv('JWT_ALGORITHM', 'HS256')],
+                                options={'require': ['exp', 'sub', 'type']})
+            if claims['type'] != 'access' or int(claims['sub']) <= 0:
+                raise ValueError('Invalid access token')
+            farmer_id = str(int(claims['sub']))
+        except (jwt.InvalidTokenError, ValueError, TypeError):
+            self._json_response(401, {'detail': 'Sign in again to start a voice call'})
+            return
+        identity = farmer_id
+        room_name = f'krn-{uuid4().hex}'
+        farmer_name = str(claims.get('name') or 'kissan')[:100]
         language = params.get('language', ['ur'])[0] or 'ur'
-
-        # Clear log so we can see if the frontend actually sent the name
-        if farmer_name and farmer_name != 'kissan':
-            print(f"[TokenServer] Received farmer_name: {farmer_name}")
-        else:
-            print(f"[TokenServer] farmer_name missing or empty; using default 'kissan'")
 
         # Generate token
         token = self._generate_token(identity, room_name)
@@ -55,17 +84,12 @@ class TokenHandler(BaseHTTPRequestHandler):
         ).start()
 
         # Send response
-        self.send_response(200)
-        self.send_header('Content-Type', 'application/json')
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.end_headers()
-        
         response = {
             'token': token,
             'identity': identity,
             'room': room_name,
         }
-        self.wfile.write(json.dumps(response).encode())
+        self._json_response(200, response)
 
         print(f"✓ Token generated for {identity} in room {room_name} (farmer_id={farmer_id}, name={farmer_name!r}, lang={language})")
     
@@ -83,11 +107,13 @@ class TokenHandler(BaseHTTPRequestHandler):
         token = (
             api.AccessToken(api_key, api_secret)
             .with_identity(identity)
+            .with_ttl(timedelta(minutes=15))
             .with_grants(
                 api.VideoGrants(
                     room_join=True,
                     room=room_name,
                     can_publish=True,
+                    can_publish_data=True,
                     can_subscribe=True,
                 )
             )

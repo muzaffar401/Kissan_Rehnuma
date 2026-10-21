@@ -30,6 +30,7 @@ from app.agents.context import SessionContext, set_session_context
 from app.core.config import get_settings
 from app.core.logging import logger
 from app.services.memory_service import extract_and_save_memory, load_farmer_memory
+from app.services.voice_workflow import VoiceWorkflow
 
 import asyncio
 import time as _time
@@ -238,6 +239,13 @@ async def entrypoint(ctx: agents.JobContext):
         },
     )
 
+    # Python RTC exposes local_participant only after connecting.
+    await ctx.connect()
+    # Register handlers before the agent starts processing farmer input.
+    workflow = VoiceWorkflow(ctx.room, session, session_ctx, str(farmer_id))
+    session_ctx.photo_workflow = workflow
+    workflow.register()
+
     # Start the session
     await session.start(
         room=ctx.room,
@@ -245,9 +253,13 @@ async def entrypoint(ctx: agents.JobContext):
             farmer_name=farmer_name,
             farmer_memory=farmer_memory,
             language=language,
+            workflow=workflow,
         ),
         room_input_options=RoomInputOptions(),
     )
+    async with workflow.lock:
+        if workflow.version == 0:
+            await workflow.publish()
 
     logger.info(
         "Voice session active",

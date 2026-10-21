@@ -14,6 +14,7 @@ import {
   Easing,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -41,8 +42,11 @@ import type { ColorPalette } from '../theme/colors';
 import { useTranslation } from 'react-i18next';
 import i18n from '../i18n';
 import { tokenStorage } from '../services/tokenStorage';
-import { fetchVoiceToken, generateRoomName } from '../services/helplineService';
+import { fetchVoiceToken } from '../services/helplineService';
 import { LIVEKIT_URL } from '../services/config';
+import InCallHelp from '../components/InCallHelp';
+import { parseWorkflowState, WorkflowRenderTracker } from '../services/voiceWorkflow';
+import type { WorkflowAction, WorkflowState } from '../services/voiceWorkflow';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -78,6 +82,18 @@ export default function VoiceCallScreen({ onNavigate }: VoiceCallScreenProps) {
   const [errorMsg, setErrorMsg] = useState('');
   const [agentSpeaking, setAgentSpeaking] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
+  const [workflow, setWorkflow] = useState<WorkflowState | null>(null);
+  const [callReconnecting, setCallReconnecting] = useState(false);
+  const [workflowSyncFailed, setWorkflowSyncFailed] = useState(false);
+  const attemptRef = useRef(0);
+  const agentIdentityRef = useRef<string | null>(null);
+  const audioElementsRef = useRef<HTMLMediaElement[]>([]);
+  const workflowScrollRef = useRef<ScrollView>(null);
+  const renderTrackerRef = useRef(new WorkflowRenderTracker());
+  const onWorkflowRendered = useCallback((version: number) => {
+    workflowScrollRef.current?.scrollTo({ y: 0, animated: false });
+    renderTrackerRef.current.rendered(version);
+  }, []);
 
   // Refs for cleanup
   const roomRef = useRef<Room | null>(null);
@@ -98,7 +114,7 @@ export default function VoiceCallScreen({ onNavigate }: VoiceCallScreenProps) {
   useEffect(() => {
     let animations: Animated.CompositeAnimation[] = [];
 
-    if (callState === 'connected') {
+    if (callState === 'connecting') {
       const animateRing = (anim: Animated.Value, delay: number) =>
         Animated.loop(
           Animated.sequence([
@@ -201,6 +217,11 @@ export default function VoiceCallScreen({ onNavigate }: VoiceCallScreenProps) {
   }, []);
 
   const disconnect = useCallback(async () => {
+    renderTrackerRef.current.reset();
+    attemptRef.current += 1;
+    agentIdentityRef.current = null;
+    audioElementsRef.current.forEach(element => { element.pause(); element.remove(); });
+    audioElementsRef.current = [];
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -215,46 +236,50 @@ export default function VoiceCallScreen({ onNavigate }: VoiceCallScreenProps) {
       localTrackRef.current = null;
     }
 
-    if (roomRef.current) {
+    const room = roomRef.current;
+    roomRef.current = null;
+    if (room) {
       try {
-        await roomRef.current.disconnect();
+        await room.disconnect();
       } catch {
         // ignore
       }
-      roomRef.current = null;
     }
 
     setCallState('idle');
     setIsMuted(false);
     setIsSpeakerOn(true);
     setAgentSpeaking(false);
+    setCallReconnecting(false);
   }, []);
 
+  const acceptWorkflow = useCallback((payload: string) => {
+    const next = parseWorkflowState(payload);
+    setWorkflowSyncFailed(false);
+    setWorkflow(previous => !previous || next.version >= previous.version ? next : previous);
+    return next;
+  }, []);
+
+  const sendWorkflowAction = useCallback(async (action: WorkflowAction) => {
+    const room = roomRef.current;
+    const agent = agentIdentityRef.current;
+    if (!room || !agent) throw new Error('Assistant is not connected');
+    const response = await room.localParticipant.performRpc({
+      destinationIdentity: agent, method: 'kissan.action', payload: JSON.stringify(action), responseTimeout: 20000,
+    });
+    if (roomRef.current !== room) throw new Error('Call ended');
+    return acceptWorkflow(response);
+  }, [acceptWorkflow]);
+
   const startCall = async () => {
+    const attempt = ++attemptRef.current;
     setCallState('requesting-token');
     setErrorMsg('');
+    setWorkflow(null);
 
     try {
-      const farmerId = await tokenStorage.getUserId();
-      let farmerName = await tokenStorage.getUserName();
-
-      // If name is still missing, warn but keep going with a friendly default
-      if (!farmerName) {
-        console.warn('[VoiceCall] Farmer name not found in storage/JWT');
-      }
-
-      const roomName = generateRoomName();
-      const identity = farmerId ?? 'anonymous_farmer';
-
-      console.log('[VoiceCall] Starting call:', { farmerId, farmerName, roomName });
-
-      const { token } = await fetchVoiceToken(
-        identity,
-        roomName,
-        farmerId,
-        farmerName ?? null,
-        i18n.language,
-      );
+      const { token, identity } = await fetchVoiceToken(i18n.language);
+      if (attempt !== attemptRef.current) return;
       console.log('[VoiceCall] Token received, agent dispatched with farmer info and language:', i18n.language);
 
       setCallState('connecting');
@@ -265,11 +290,54 @@ export default function VoiceCallScreen({ onNavigate }: VoiceCallScreenProps) {
       });
       roomRef.current = room;
 
+      room.localParticipant.registerRpcMethod('kissan.ui', async data => {
+        const caller = room.remoteParticipants.get(data.callerIdentity);
+        if (!caller?.isAgent || roomRef.current !== room) throw new Error('Untrusted UI event');
+        agentIdentityRef.current = caller.identity;
+        const next = parseWorkflowState(data.payload);
+        const rendered = renderTrackerRef.current.waitFor(next.version);
+        acceptWorkflow(data.payload);
+        await rendered;
+        return JSON.stringify({ received: true, version: next.version });
+      });
+
+      const syncAgent = (participant: Participant) => {
+        if (!participant.isAgent || roomRef.current !== room) return;
+        agentIdentityRef.current = participant.identity;
+        void sendWorkflowAction({ action: 'sync' }).catch(() => setWorkflowSyncFailed(true));
+      };
+      room.on(RoomEvent.ParticipantConnected, syncAgent);
+      room.on(RoomEvent.Reconnecting, () => setCallReconnecting(true));
+      room.on(RoomEvent.Reconnected, () => {
+        setCallReconnecting(false);
+        room.remoteParticipants.forEach(syncAgent);
+      });
+      room.on(RoomEvent.Disconnected, () => {
+        if (roomRef.current === room) {
+          void disconnect().then(() => {
+            setErrorMsg(t('voiceCall.callFailed'));
+            setCallState('error');
+          });
+        }
+      });
+
       room.on(RoomEvent.TrackSubscribed, (_track: RemoteTrack, publication: TrackPublication, participant: Participant) => {
+        if (roomRef.current !== room) return;
         console.log('[VoiceCall] Track subscribed:', publication.source, participant.identity);
         if (publication.kind === 'audio' && _track) {
-          (_track as any).attach?.();
+          if (Platform.OS === 'web') {
+            const element = _track.attach();
+            audioElementsRef.current.push(element);
+            void element.play().catch(() => { /* Browser may require the user's audio gesture. */ });
+          }
         }
+      });
+      room.on(RoomEvent.TrackUnsubscribed, track => {
+        if (Platform.OS === 'web') track.detach().forEach(element => {
+          element.pause();
+          element.remove();
+          audioElementsRef.current = audioElementsRef.current.filter(item => item !== element);
+        });
       });
 
       room.on(RoomEvent.ActiveSpeakersChanged, (speakers: Participant[]) => {
@@ -280,13 +348,18 @@ export default function VoiceCallScreen({ onNavigate }: VoiceCallScreenProps) {
       });
 
       await room.connect(LIVEKIT_URL, token);
+      if (attempt !== attemptRef.current) { await room.disconnect(); return; }
+      room.remoteParticipants.forEach(syncAgent);
 
       const localTrack = await createLocalAudioTrack();
+      if (attempt !== attemptRef.current) { localTrack.stop(); await room.disconnect(); return; }
       localTrackRef.current = localTrack as any;
       await room.localParticipant.publishTrack(localTrack);
 
       setCallState('connected');
     } catch (err) {
+      if (attempt !== attemptRef.current) return;
+      await disconnect();
       console.error('[VoiceCall] Connection failed:', err);
       setErrorMsg(err instanceof Error ? err.message : 'Call failed');
       setCallState('error');
@@ -352,6 +425,7 @@ export default function VoiceCallScreen({ onNavigate }: VoiceCallScreenProps) {
   };
 
   const isConnecting = callState === 'requesting-token' || callState === 'connecting';
+  const hasWorkflowCard = !!workflow && workflow.phase !== 'idle';
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.primaryContainer }]} edges={['top', 'bottom']}>
@@ -361,19 +435,26 @@ export default function VoiceCallScreen({ onNavigate }: VoiceCallScreenProps) {
           <MaterialCommunityIcons name="chevron-down" size={28} color={colors.onPrimary} />
         </Pressable>
         <Text style={styles.topBarTitle}>{t('voiceCall.title')}</Text>
-        <View style={styles.iconBtn} />
+        {callState === 'connected' ? <Pressable style={styles.iconBtn} accessibilityRole="button"
+          accessibilityLabel={t('voiceHelp.connect')} onPress={() => {
+            void sendWorkflowAction({ action: 'sync' }).catch(() => setWorkflowSyncFailed(true));
+          }}>
+          <MaterialCommunityIcons name="refresh" size={22} color={colors.onPrimary} />
+        </Pressable> : <View style={styles.iconBtn} />}
       </View>
 
       {/* Main content */}
-      <View style={styles.content}>
+      <ScrollView ref={workflowScrollRef} style={{ flex: 1 }}
+        contentContainerStyle={[styles.content, hasWorkflowCard && { justifyContent: 'flex-start', paddingTop: 12 }]}
+        keyboardShouldPersistTaps="handled">
         {/* Avatar with animated rings */}
-        <View style={styles.avatarWrapper}>
+        {!hasWorkflowCard ? <View style={styles.avatarWrapper}>
           <Animated.View
             style={[
               styles.ring,
               {
                 transform: [{ scale: ring1 }],
-                opacity: callState === 'connected' ? 0.25 : 0,
+                opacity: callState === 'connecting' ? 0.25 : 0,
               },
             ]}
           />
@@ -382,7 +463,7 @@ export default function VoiceCallScreen({ onNavigate }: VoiceCallScreenProps) {
               styles.ring,
               {
                 transform: [{ scale: ring2 }],
-                opacity: callState === 'connected' ? 0.2 : 0,
+                opacity: callState === 'connecting' ? 0.2 : 0,
               },
             ]}
           />
@@ -391,18 +472,18 @@ export default function VoiceCallScreen({ onNavigate }: VoiceCallScreenProps) {
               styles.ring,
               {
                 transform: [{ scale: ring3 }],
-                opacity: callState === 'connected' ? 0.15 : 0,
+                opacity: callState === 'connecting' ? 0.15 : 0,
               },
             ]}
           />
           <View style={styles.avatar}>
             <MaterialCommunityIcons name="headset" size={56} color={colors.onPrimary} />
           </View>
-        </View>
+        </View> : null}
 
         {/* Agent info */}
-        <View style={styles.infoContainer}>
-          <Text style={styles.agentName}>{t('voiceCall.agentName')}</Text>
+        <View style={[styles.infoContainer, hasWorkflowCard && { marginBottom: 0, gap: 4 }]}>
+          <Text style={[styles.agentName, hasWorkflowCard && { fontSize: 18 }]}>{t('voiceCall.agentName')}</Text>
           {userName ? (
             <Text style={styles.callingAsText}>{t('voiceCall.callingAs', { name: userName })}</Text>
           ) : null}
@@ -415,7 +496,11 @@ export default function VoiceCallScreen({ onNavigate }: VoiceCallScreenProps) {
           {callState === 'connected' && (
             <Text style={styles.timerText}>{formatTime(elapsed)}</Text>
           )}
+          {workflowSyncFailed ? <Text style={styles.statusText}>{t('voiceHelp.syncError')}</Text> : null}
         </View>
+
+        {callState === 'connected' ? <InCallHelp key={attemptRef.current} state={workflow}
+          connected={!callReconnecting} sendAction={sendWorkflowAction} onRendered={onWorkflowRendered} /> : null}
 
         {/* Sound wave visualizer (shown when connected) */}
         {callState === 'connected' && (
@@ -434,10 +519,10 @@ export default function VoiceCallScreen({ onNavigate }: VoiceCallScreenProps) {
             ))}
           </View>
         )}
-      </View>
+      </ScrollView>
 
       {/* Bottom controls */}
-      <View style={styles.controls}>
+      <View style={[styles.controls, callState === 'connected' && { paddingTop: 8, paddingBottom: 12, gap: 8 }]}>
         {callState === 'connected' ? (
           <>
             {/* Row 1: Mute + Speaker */}
@@ -468,7 +553,7 @@ export default function VoiceCallScreen({ onNavigate }: VoiceCallScreenProps) {
             </View>
 
             {/* End call button */}
-            <Pressable style={styles.endCallBtn} onPress={endCall}>
+            <Pressable style={[styles.endCallBtn, { height: 48 }]} onPress={endCall}>
               <MaterialCommunityIcons name="phone-hangup" size={32} color={colors.onPrimary} />
               <Text style={styles.endCallText}>{t('voiceCall.endCall')}</Text>
             </Pressable>
@@ -530,7 +615,7 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
     textAlign: 'center',
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,

@@ -48,6 +48,10 @@ async def register_complaint(
     from uuid import UUID
     ctx = get_session_context()
 
+    workflow = getattr(ctx, "photo_workflow", None)
+    if workflow and workflow.phase != "idle":
+        return {"success": False, "message": "For this photo-linked case use prepare_help_request and confirm_help_request; do not register a second complaint."}
+
     # Convert farmer_id to UUID for DB query (handles int/str/UUID)
     try:
         farmer_uuid = UUID(str(ctx.farmer_id))

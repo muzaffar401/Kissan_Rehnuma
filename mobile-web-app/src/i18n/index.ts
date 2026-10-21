@@ -15,6 +15,7 @@ import { initReactI18next } from 'react-i18next';
 import en from './en.json';
 import ur from './ur.json';
 import sd from './sd.json';
+import voiceHelp from './voiceHelp.json';
 
 export const SUPPORTED_LANGUAGES = ['en', 'ur', 'sd'] as const;
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
@@ -37,9 +38,9 @@ export function isRTL(lang: string): boolean {
 
 i18n.use(initReactI18next).init({
   resources: {
-    en: { translation: en },
-    ur: { translation: ur },
-    sd: { translation: sd },
+    en: { translation: { ...en, voiceHelp: voiceHelp.en } },
+    ur: { translation: { ...ur, voiceHelp: voiceHelp.ur } },
+    sd: { translation: { ...sd, voiceHelp: voiceHelp.sd } },
   },
   lng: 'en', // default — App.tsx will call changeLanguage() after loading saved preference
   fallbackLng: 'en',
